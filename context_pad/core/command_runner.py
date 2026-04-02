@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import traceback
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 try:
     import maya.cmds as cmds  # type: ignore
@@ -67,8 +67,9 @@ def run_button_action(button_data: Dict[str, Any]) -> bool:
         return False
 
     except Exception as exc:
-        _log_error(f"Failed: {label} | {exc}")
-        _log_error(traceback.format_exc(limit=1).strip())
+        _log_error(f"Failed: {label} | {_format_exception(exc)}")
+        if bool(button_data.get("debug_traceback", False)):
+            _log_error(traceback.format_exc(limit=3).strip())
         return False
 
 
@@ -108,6 +109,16 @@ def _run_mel(code: str) -> None:
     if maya_mel is None:
         raise RuntimeError("MEL execution unavailable outside Maya")
     maya_mel.eval(code)
+
+
+def _format_exception(exc: Exception) -> str:
+    """Return concise readable exception text for Script Editor logs."""
+
+    if isinstance(exc, SyntaxError):
+        location = f"line {exc.lineno}" if exc.lineno else "unknown line"
+        text = (exc.text or "").strip()
+        return f"syntax error ({location}): {text}" if text else f"syntax error ({location})"
+    return str(exc)
 
 
 def _log_info(message: str) -> None:

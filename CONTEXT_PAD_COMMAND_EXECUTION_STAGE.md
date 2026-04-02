@@ -9,6 +9,7 @@ ok = run_button_action(button_data)
 ```
 
 - `run_button_action(button_data: dict) -> bool`
+- Optional debug key: `debug_traceback: True` to print full traceback details
 - Supports command types:
   - `python_inline`
   - `python_file`
