@@ -14,14 +14,12 @@ from context_pad.ui.widgets.pin_zone import PinZone
 class LauncherBase(QtWidgets.QWidget):
     """Shared launcher implementation for script and set overlays."""
 
-    def __init__(self, title: str, parent: QtWidgets.QWidget | None = None) -> None:
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         """Initialize base launcher widget structure."""
 
         super().__init__(parent)
-        self._title = title
         self._is_pinned = False
 
-        self.setWindowTitle(title)
         self.setWindowFlags(
             QtCore.Qt.Tool
             | QtCore.Qt.FramelessWindowHint
@@ -36,62 +34,95 @@ class LauncherBase(QtWidgets.QWidget):
         self._body = QtWidgets.QFrame()
         self._body.setObjectName("ContextPadBody")
         self._body.setStyleSheet(launcher_stylesheet())
-        self._body.setMinimumSize(380, 380)
-        self._body.setMaximumSize(420, 420)
+        self._body.setMinimumSize(340, 300)
+        self._body.setMaximumSize(430, 430)
         root_layout.addWidget(self._body)
 
         body_layout = QtWidgets.QVBoxLayout(self._body)
-        body_layout.setContentsMargins(10, 10, 10, 10)
-        body_layout.setSpacing(8)
+        body_layout.setContentsMargins(8, 8, 8, 8)
+        body_layout.setSpacing(7)
 
-        self._pin_zone = PinZone()
-        self._pin_zone.pin_toggled.connect(self.set_pinned)
-        body_layout.addWidget(self._pin_zone)
-
-        title_label = QtWidgets.QLabel(title)
-        title_label.setObjectName("ContextPadTitle")
-        body_layout.addWidget(title_label)
+        top_bar = QtWidgets.QHBoxLayout()
+        top_bar.setContentsMargins(0, 0, 0, 0)
+        top_bar.addStretch(1)
+        self._utility_bar = PinZone()
+        self._utility_bar.pin_toggled.connect(self.set_pinned)
+        self._utility_bar.add_clicked.connect(self.on_add_requested)
+        self._utility_bar.manager_clicked.connect(self.on_manager_requested)
+        top_bar.addWidget(self._utility_bar)
+        body_layout.addLayout(top_bar)
 
         content_layout = QtWidgets.QHBoxLayout()
         content_layout.setSpacing(8)
-        body_layout.addLayout(content_layout)
+        body_layout.addLayout(content_layout, 1)
 
-        self._category_bar = CategoryBar()
-        self._category_bar.setFixedWidth(130)
-        self._category_bar.category_changed.connect(self._on_category_changed)
-        content_layout.addWidget(self._category_bar)
+        self._left_column = QtWidgets.QVBoxLayout()
+        self._left_column.setContentsMargins(0, 0, 0, 0)
+        self._left_column.setSpacing(0)
+        content_layout.addLayout(self._left_column, 0)
 
-        self._command_grid = CommandGrid()
+        self._left_widget: QtWidgets.QWidget = CategoryBar()
+        self._left_column.addWidget(self._left_widget)
+
+        self._divider = QtWidgets.QFrame()
+        self._divider.setObjectName("ContextPadDivider")
+        content_layout.addWidget(self._divider)
+
+        self._command_grid = CommandGrid(columns=2)
         content_layout.addWidget(self._command_grid, 1)
 
+    def set_left_widget(self, widget: QtWidgets.QWidget) -> None:
+        """Replace left column widget with a custom widget."""
+
+        if self._left_widget is widget:
+            return
+        self._left_column.removeWidget(self._left_widget)
+        self._left_widget.deleteLater()
+        self._left_widget = widget
+        self._left_column.addWidget(self._left_widget)
+
+    def set_button_columns(self, columns: int) -> None:
+        """Set number of columns for the right button grid."""
+
+        self._command_grid.set_columns(columns)
+
     def show_at_cursor(self) -> None:
-        """Show the launcher near cursor and focus it."""
+        """Show launcher near cursor and focus it."""
 
         cursor_pos = QtGui.QCursor.pos()
-        self.move(cursor_pos + QtCore.QPoint(12, 12))
+        self.move(cursor_pos + QtCore.QPoint(10, 10))
         self.show()
         self.raise_()
         self.activateWindow()
 
     def set_categories(self, data: List[Dict[str, str]]) -> None:
-        """Set launcher categories from data records."""
+        """Set categories when default left category widget is active."""
 
-        self._category_bar.set_categories(data)
+        if isinstance(self._left_widget, CategoryBar):
+            self._left_widget.set_categories(data)
 
     def set_buttons(self, data: List[Dict[str, str]]) -> None:
         """Set launcher buttons from data records."""
 
         self._command_grid.set_buttons(data)
-        self._command_grid.filter_by_category(self._category_bar.current_category())
+        if isinstance(self._left_widget, CategoryBar):
+            self._command_grid.filter_by_category(self._left_widget.current_category())
 
     def set_pinned(self, state: bool) -> None:
         """Set pin state for launcher behavior."""
 
         self._is_pinned = state
-        self._pin_zone.set_pinned(state)
+        self._utility_bar.set_pinned(state)
+
+
+    def on_add_requested(self) -> None:
+        """Placeholder callback for future quick-create action."""
+
+    def on_manager_requested(self) -> None:
+        """Placeholder callback for opening manager window."""
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:  # noqa: N802
-        """Close the launcher when ESC is pressed."""
+        """Close launcher when ESC is pressed."""
 
         if event.key() == QtCore.Qt.Key_Escape:
             self.close()
@@ -104,8 +135,3 @@ class LauncherBase(QtWidgets.QWidget):
         super().focusOutEvent(event)
         if not self._is_pinned:
             self.close()
-
-    def _on_category_changed(self, category_id: str) -> None:
-        """Refresh visible buttons for currently selected category."""
-
-        self._command_grid.filter_by_category(category_id)

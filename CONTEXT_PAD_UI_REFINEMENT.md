@@ -1,0 +1,40 @@
+# Context Pad UI Refinement Notes
+
+## 1) Intended visual hierarchy (concise)
+
+1. **Body shell first**: compact translucent charcoal surface with rounded corners and minimal border.
+2. **Utility controls second**: tiny top-right icon controls (add, manager, pin) for low-noise access.
+3. **Primary action content third**: left contextual rail + right action area with top-aligned click targets.
+4. **Color and labels fourth**: muted button colors with automatic text contrast for readability.
+
+## 2) Script Launcher layout
+
+- Left: narrow **Categories** rail.
+- Center: subtle thin vertical divider.
+- Right: compact 2-column action grid, top-aligned.
+- No large title strip; utility icons stay in compact top-right area.
+
+## 3) Set Launcher layout
+
+- Left: narrow **Related** list for contextual quick sets.
+- Center: subtle divider.
+- Right: stable **All Sets** button area in compact 2-column top-aligned grid.
+- Left is contextual shortcuts, right is full/primary action area.
+
+## 4) Specific UI changes from previous implementation
+
+- Removed large pin text button and replaced with tiny dot icon state (`○` unpinned / `●` pinned).
+- Removed large title header block to recover vertical action space.
+- Added icon-style utility placeholders for add (`+`) and manager (`⋯`) next to pin.
+- Reduced heavy nested-panel feeling with transparent left lists and light divider.
+- Enforced top alignment in grids and added compact spacing rhythm.
+- Added automatic button text contrast based on button color luminance.
+
+## 5) Code/UI structure updates supporting the design
+
+- `PinZone` now acts as a utility bar with three icon controls and signals for future hooks.
+- `LauncherBase` now exposes lightweight extension points:
+  - replaceable left widget (`set_left_widget`)
+  - configurable button columns (`set_button_columns`)
+  - placeholder callbacks (`on_add_requested`, `on_manager_requested`)
+- Added `RelatedSetsList` widget so Set Launcher can use contextual left-column content without reworking core architecture.

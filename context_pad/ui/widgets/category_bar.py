@@ -20,11 +20,22 @@ class CategoryBar(QtWidgets.QWidget):
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        self._label = QtWidgets.QLabel("Categories")
+        self._label.setObjectName("ContextPadLeftLabel")
+        layout.addWidget(self._label)
 
         self._list = QtWidgets.QListWidget()
         self._list.setObjectName("ContextPadCategoryList")
         self._list.itemSelectionChanged.connect(self._on_selection_changed)
-        layout.addWidget(self._list)
+        layout.addWidget(self._list, 1)
+
+    def set_title(self, title: str) -> None:
+        """Set optional compact title for the left column."""
+
+        self._label.setText(title)
+        self._label.setVisible(bool(title))
 
     def set_categories(self, categories: List[Dict[str, str]]) -> None:
         """Populate categories from data records with id/name/color keys."""
@@ -37,7 +48,7 @@ class CategoryBar(QtWidgets.QWidget):
             item.setData(QtCore.Qt.UserRole, category.get("id", ""))
             color = category.get("color")
             if color:
-                item.setBackground(QtGui.QColor(color))
+                item.setForeground(QtGui.QColor(color))
             self._list.addItem(item)
 
         if self._list.count() > 0:

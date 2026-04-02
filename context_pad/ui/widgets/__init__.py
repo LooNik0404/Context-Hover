@@ -1,1 +1,1 @@
-"""Package module."""
+"""UI widgets package."""

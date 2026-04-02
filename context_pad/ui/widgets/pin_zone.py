@@ -1,4 +1,4 @@
-"""Pin-zone widget for launcher pin state."""
+"""Minimal utility controls for launcher pin and quick actions."""
 
 from __future__ import annotations
 
@@ -6,41 +6,53 @@ from context_pad.maya_integration.qt_helpers import QtCore, QtWidgets
 
 
 class PinZone(QtWidgets.QFrame):
-    """Top strip widget with a toggle button for pin mode."""
+    """Compact top-right utility zone with icon-style controls."""
 
     pin_toggled = QtCore.Signal(bool)
+    add_clicked = QtCore.Signal()
+    manager_clicked = QtCore.Signal()
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
-        """Initialize the pin zone UI."""
+        """Initialize utility controls."""
 
         super().__init__(parent)
-        self.setObjectName("ContextPadPinZone")
+        self.setObjectName("ContextPadUtilityBar")
 
-        self._pin_button = QtWidgets.QPushButton("📌 Unpinned")
-        self._pin_button.setObjectName("ContextPadPinButton")
+        self._pin_button = self._make_icon_button("○")
         self._pin_button.setCheckable(True)
-        self._pin_button.toggled.connect(self._on_toggled)
+        self._pin_button.toggled.connect(self._on_pin_toggled)
+
+        self._add_button = self._make_icon_button("+")
+        self._add_button.clicked.connect(self.add_clicked)
+
+        self._manager_button = self._make_icon_button("⋯")
+        self._manager_button.clicked.connect(self.manager_clicked)
 
         layout = QtWidgets.QHBoxLayout(self)
-        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        layout.addWidget(self._add_button)
+        layout.addWidget(self._manager_button)
         layout.addWidget(self._pin_button)
-        layout.addStretch(1)
 
     def set_pinned(self, state: bool) -> None:
-        """Update the pin button state without duplicate signal emissions."""
+        """Update pinned visual state."""
 
         blocker = QtCore.QSignalBlocker(self._pin_button)
         _ = blocker
         self._pin_button.setChecked(state)
-        self._set_pin_label(state)
+        self._pin_button.setText("●" if state else "○")
 
-    def _on_toggled(self, state: bool) -> None:
-        """Emit pin toggled and refresh label."""
+    def _on_pin_toggled(self, state: bool) -> None:
+        """Emit pin changes using a minimal dot-state icon."""
 
-        self._set_pin_label(state)
+        self._pin_button.setText("●" if state else "○")
         self.pin_toggled.emit(state)
 
-    def _set_pin_label(self, state: bool) -> None:
-        """Set visible pin label based on current state."""
+    def _make_icon_button(self, glyph: str) -> QtWidgets.QToolButton:
+        """Create a tiny icon-style utility button."""
 
-        self._pin_button.setText("📌 Pinned" if state else "📌 Unpinned")
+        button = QtWidgets.QToolButton(self)
+        button.setObjectName("ContextPadIconButton")
+        button.setText(glyph)
+        return button

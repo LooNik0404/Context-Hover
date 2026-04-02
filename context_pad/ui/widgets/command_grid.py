@@ -12,25 +12,33 @@ class CommandGrid(QtWidgets.QWidget):
 
     button_clicked = QtCore.Signal(dict)
 
-    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+    def __init__(self, parent: QtWidgets.QWidget | None = None, columns: int = 2) -> None:
         """Initialize the command grid."""
 
         super().__init__(parent)
         self._buttons: List[Dict[str, str]] = []
+        self._columns = max(1, columns)
 
         self._layout = QtWidgets.QGridLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setHorizontalSpacing(6)
         self._layout.setVerticalSpacing(6)
+        self._layout.setAlignment(QtCore.Qt.AlignTop)
+
+    def set_columns(self, columns: int) -> None:
+        """Set number of columns used for button layout."""
+
+        self._columns = max(1, columns)
+        self._rebuild_grid(self._buttons)
 
     def set_buttons(self, buttons: List[Dict[str, str]]) -> None:
-        """Populate the grid from button records with id/name/color/category_id keys."""
+        """Populate grid from button records with id/name/color/category_id keys."""
 
         self._buttons = buttons
         self._rebuild_grid(buttons)
 
     def filter_by_category(self, category_id: str) -> None:
-        """Display buttons matching a category id, or all when blank."""
+        """Display buttons matching category id, or all when blank."""
 
         filtered = [b for b in self._buttons if not category_id or b.get("category_id") == category_id]
         self._rebuild_grid(filtered)
@@ -47,9 +55,22 @@ class CommandGrid(QtWidgets.QWidget):
         for index, item_data in enumerate(buttons):
             button = QtWidgets.QPushButton(item_data.get("name", "Button"))
             button.setObjectName("ContextPadCommandButton")
-            color = QtGui.QColor(item_data.get("color", "#4A89DC"))
-            button.setStyleSheet(f"background-color: {color.name()};")
+
+            background = QtGui.QColor(item_data.get("color", "#4A89DC"))
+            foreground = self._contrast_color(background)
+            button.setStyleSheet(
+                f"background-color: {background.name()}; color: {foreground.name()};"
+            )
             button.clicked.connect(lambda _=False, data=item_data: self.button_clicked.emit(data))
-            row = index // 2
-            col = index % 2
+
+            row = index // self._columns
+            col = index % self._columns
             self._layout.addWidget(button, row, col)
+
+        self._layout.setRowStretch((len(buttons) // self._columns) + 1, 1)
+
+    def _contrast_color(self, color: QtGui.QColor) -> QtGui.QColor:
+        """Return black/white text color based on luminance contrast."""
+
+        luminance = (0.299 * color.red()) + (0.587 * color.green()) + (0.114 * color.blue())
+        return QtGui.QColor("#111111") if luminance > 170 else QtGui.QColor("#F4F6FA")
