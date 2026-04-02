@@ -6,7 +6,7 @@
 from context_pad.core.script_registry import ScriptRegistry
 
 registry = ScriptRegistry()
-registry.load_manifest("manifest/manifest.json")
+registry.load_manifest("context_pad/manifest/manifest.json")
 categories = registry.get_categories()
 buttons = registry.get_buttons_for_category("anim")
 ```
@@ -49,8 +49,8 @@ Required:
 
 ## Sample manifests
 
-- Valid sample: `manifest/manifest.json`
-- Intentionally broken sample: `manifest/manifest_broken.json`
+- Valid sample: `context_pad/manifest/manifest.json`
+- Intentionally broken sample: `context_pad/manifest/manifest_broken.json`
 
 ## Harness / usage example
 
@@ -72,12 +72,12 @@ print("broken_error:", result["broken_error"])
 from context_pad.core.script_registry import ScriptRegistry, ManifestValidationError
 
 registry = ScriptRegistry()
-registry.load_manifest("manifest/manifest.json")
+registry.load_manifest("context_pad/manifest/manifest.json")
 print(registry.get_categories())
 print(registry.get_buttons_for_category("anim"))
 
 try:
-    registry.load_manifest("manifest/manifest_broken.json")
+    registry.load_manifest("context_pad/manifest/manifest_broken.json")
 except ManifestValidationError as exc:
     print("Validation error:", exc)
 ```
@@ -88,7 +88,7 @@ except ManifestValidationError as exc:
 from context_pad.core.script_registry import ScriptRegistry
 
 registry = ScriptRegistry()
-registry.load_manifest(r"C:/Users/Nikita/Documents/maya/scripts/context_pad/manifest/manifest.json")
+registry.load_manifest()  # default: context_pad/manifest/manifest.json
 for category in registry.get_categories():
     print(category["label"], "->", [b["label"] for b in registry.get_buttons_for_category(category["id"])])
 ```

@@ -5,17 +5,22 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List
 
+from context_pad.config import DEFAULT_CONFIG
+
 from .script_registry import ManifestValidationError, ScriptRegistry
 
 
 def run_registry_demo(
-    valid_manifest: str | Path = "manifest/manifest.json",
-    broken_manifest: str | Path = "manifest/manifest_broken.json",
+    valid_manifest: str | Path | None = None,
+    broken_manifest: str | Path | None = None,
 ) -> Dict[str, object]:
     """Run valid and invalid manifest load checks and return summary."""
 
+    valid_path = valid_manifest or (DEFAULT_CONFIG.manifest_root / DEFAULT_CONFIG.manifest_filename)
+    broken_path = broken_manifest or (DEFAULT_CONFIG.manifest_root / "manifest_broken.json")
+
     registry = ScriptRegistry()
-    valid_ok = registry.load_manifest(valid_manifest)
+    valid_ok = registry.load_manifest(valid_path)
 
     categories = registry.get_categories()
     buttons_by_category: Dict[str, List[dict]] = {
@@ -24,7 +29,7 @@ def run_registry_demo(
 
     broken_error = ""
     try:
-        registry.load_manifest(broken_manifest)
+        registry.load_manifest(broken_path)
     except ManifestValidationError as exc:
         broken_error = str(exc)
 

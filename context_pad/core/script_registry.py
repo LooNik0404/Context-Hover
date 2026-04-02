@@ -55,7 +55,7 @@ class ScriptRegistry:
     def load_manifest(self, path: str | Path | None = None) -> bool:
         """Load and validate manifest JSON from disk."""
 
-        manifest_path = Path(path) if path else DEFAULT_CONFIG.manifest_root / DEFAULT_CONFIG.manifest_filename
+        manifest_path = self._resolve_manifest_path(path)
         if not manifest_path.exists() or not manifest_path.is_file():
             raise ManifestValidationError(f"manifest file not found: {manifest_path}")
 
@@ -139,6 +139,22 @@ class ScriptRegistry:
                 )
 
         return True
+
+    def _resolve_manifest_path(self, path: str | Path | None) -> Path:
+        """Resolve manifest path using config root and package-relative fallback."""
+
+        if path is None:
+            return DEFAULT_CONFIG.manifest_root / DEFAULT_CONFIG.manifest_filename
+
+        candidate = Path(path).expanduser()
+        if candidate.is_absolute() or candidate.exists():
+            return candidate
+
+        package_relative = DEFAULT_CONFIG.manifest_root.parent / candidate
+        if package_relative.exists():
+            return package_relative
+
+        return candidate
 
     def get_categories(self) -> List[Dict[str, Any]]:
         """Return categories in stable sorted order."""
