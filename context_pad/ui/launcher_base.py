@@ -34,8 +34,7 @@ class LauncherBase(QtWidgets.QWidget):
         self._body = QtWidgets.QFrame()
         self._body.setObjectName("ContextPadBody")
         self._body.setStyleSheet(launcher_stylesheet())
-        self._body.setMinimumSize(340, 300)
-        self._body.setMaximumSize(430, 430)
+        self._body.setFixedSize(400, 308)
         root_layout.addWidget(self._body)
 
         body_layout = QtWidgets.QVBoxLayout(self._body)
@@ -44,12 +43,11 @@ class LauncherBase(QtWidgets.QWidget):
 
         top_bar = QtWidgets.QHBoxLayout()
         top_bar.setContentsMargins(0, 0, 0, 0)
-        top_bar.addStretch(1)
         self._utility_bar = PinZone()
         self._utility_bar.pin_toggled.connect(self.set_pinned)
         self._utility_bar.add_clicked.connect(self.on_add_requested)
         self._utility_bar.manager_clicked.connect(self.on_manager_requested)
-        top_bar.addWidget(self._utility_bar)
+        top_bar.addWidget(self._utility_bar, 1)
         body_layout.addLayout(top_bar)
 
         content_layout = QtWidgets.QHBoxLayout()
@@ -62,6 +60,7 @@ class LauncherBase(QtWidgets.QWidget):
         content_layout.addLayout(self._left_column, 0)
 
         self._left_widget: QtWidgets.QWidget = CategoryBar()
+        self._left_widget.setFixedWidth(116)
         self._left_column.addWidget(self._left_widget)
 
         self._divider = QtWidgets.QFrame()
@@ -79,6 +78,7 @@ class LauncherBase(QtWidgets.QWidget):
         self._left_column.removeWidget(self._left_widget)
         self._left_widget.deleteLater()
         self._left_widget = widget
+        self._left_widget.setFixedWidth(116)
         self._left_column.addWidget(self._left_widget)
 
     def set_button_columns(self, columns: int) -> None:
@@ -113,7 +113,6 @@ class LauncherBase(QtWidgets.QWidget):
 
         self._is_pinned = state
         self._utility_bar.set_pinned(state)
-
 
     def on_add_requested(self) -> None:
         """Placeholder callback for future quick-create action."""

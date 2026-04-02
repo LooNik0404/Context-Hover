@@ -19,22 +19,32 @@ def launcher_stylesheet() -> str:
         letter-spacing: 0.5px;
         padding-left: 2px;
     }
-    QListWidget#ContextPadCategoryList,
-    QListWidget#ContextPadRelatedList {
+    QListWidget#ContextPadCategoryList {
         background: transparent;
         border: none;
         color: rgb(220, 223, 228);
         outline: none;
     }
-    QListWidget#ContextPadCategoryList::item,
-    QListWidget#ContextPadRelatedList::item {
+    QListWidget#ContextPadCategoryList::item {
         padding: 5px 6px;
         margin: 1px 0px;
         border-radius: 6px;
     }
-    QListWidget#ContextPadCategoryList::item:selected,
-    QListWidget#ContextPadRelatedList::item:selected {
+    QListWidget#ContextPadCategoryList::item:selected {
         background: rgba(130, 160, 205, 75);
+        color: rgb(240, 243, 248);
+    }
+    QPushButton#ContextPadRailButton {
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 16);
+        border-radius: 6px;
+        color: rgb(220, 223, 228);
+        padding: 5px 6px;
+        text-align: left;
+    }
+    QPushButton#ContextPadRailButton:checked {
+        background: rgba(130, 160, 205, 75);
+        border: 1px solid rgba(160, 190, 235, 60);
         color: rgb(240, 243, 248);
     }
     QFrame#ContextPadDivider {

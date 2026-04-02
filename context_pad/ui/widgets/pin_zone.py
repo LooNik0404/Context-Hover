@@ -6,7 +6,7 @@ from context_pad.maya_integration.qt_helpers import QtCore, QtWidgets
 
 
 class PinZone(QtWidgets.QFrame):
-    """Compact top-right utility zone with icon-style controls."""
+    """Compact top utility zone with icon-style controls."""
 
     pin_toggled = QtCore.Signal(bool)
     add_clicked = QtCore.Signal()
@@ -33,6 +33,7 @@ class PinZone(QtWidgets.QFrame):
         layout.setSpacing(4)
         layout.addWidget(self._add_button)
         layout.addWidget(self._manager_button)
+        layout.addStretch(1)
         layout.addWidget(self._pin_button)
 
     def set_pinned(self, state: bool) -> None:

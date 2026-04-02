@@ -16,7 +16,7 @@
 
 ## 3) Set Launcher layout
 
-- Left: narrow **Related** list for contextual quick sets.
+- Left: narrow **Related** button rail for contextual quick sets.
 - Center: subtle divider.
 - Right: stable **All Sets** button area in compact 2-column top-aligned grid.
 - Left is contextual shortcuts, right is full/primary action area.
@@ -37,4 +37,4 @@
   - replaceable left widget (`set_left_widget`)
   - configurable button columns (`set_button_columns`)
   - placeholder callbacks (`on_add_requested`, `on_manager_requested`)
-- Added `RelatedSetsList` widget so Set Launcher can use contextual left-column content without reworking core architecture.
+- Added `RelatedSetsList` widget so Set Launcher can use contextual left-column buttons without reworking core architecture.
