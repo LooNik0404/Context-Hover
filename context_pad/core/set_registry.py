@@ -1,29 +1,75 @@
-"""Registry abstraction for scene-local selection sets."""
+"""UI-independent registry facade for scene selection set operations."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Iterable, List
+from typing import List, Optional
 
-
-@dataclass(frozen=True)
-class SetEntry:
-    """Data object describing a scene set launcher item."""
-
-    set_id: str
-    label: str
-    category_id: str
+from context_pad.maya_integration import maya_sets
 
 
 class SetRegistry:
-    """Read-only placeholder registry for scene set entries."""
+    """Facade over Maya set integration functions for launcher/service layers."""
 
-    def list_sets(self) -> List[SetEntry]:
-        """Return all scene set entries."""
+    def list_scene_sets(self) -> List[str]:
+        """List all non-default scene sets."""
 
-        return []
+        return maya_sets.list_scene_sets()
 
-    def by_category(self, category_id: str) -> Iterable[SetEntry]:
-        """Return set entries for a category id."""
+    def select_set(self, name: str) -> bool:
+        """Select members of a set."""
 
-        return [entry for entry in self.list_sets() if entry.category_id == category_id]
+        return maya_sets.select_set(name)
+
+    def replace_with_set(self, name: str) -> bool:
+        """Replace current selection with set members."""
+
+        return maya_sets.replace_with_set(name)
+
+    def add_set_to_selection(self, name: str) -> bool:
+        """Add set members to current selection."""
+
+        return maya_sets.add_set_to_selection(name)
+
+    def remove_set_from_selection(self, name: str) -> bool:
+        """Remove set members from current selection."""
+
+        return maya_sets.remove_set_from_selection(name)
+
+    def create_set_from_selection(self, name: str) -> bool:
+        """Create new set from current selection."""
+
+        return maya_sets.create_set_from_selection(name)
+
+    def update_set_from_selection(self, name: str) -> bool:
+        """Update existing set from current selection."""
+
+        return maya_sets.update_set_from_selection(name)
+
+    def rename_set(self, old_name: str, new_name: str) -> bool:
+        """Rename set safely."""
+
+        return maya_sets.rename_set(old_name, new_name)
+
+    def delete_set(self, name: str) -> bool:
+        """Delete set safely."""
+
+        return maya_sets.delete_set(name)
+
+    def get_sets_for_object(self, node_name: str) -> List[str]:
+        """Return all sets containing a node."""
+
+        return maya_sets.get_sets_for_object(node_name)
+
+    def get_set_size(self, name: str) -> int:
+        """Return set member count."""
+
+        return maya_sets.get_set_size(name)
+
+    def get_related_sets_for_selection(
+        self,
+        selection: Optional[List[str]] = None,
+        require_all: bool = True,
+    ) -> List[str]:
+        """Return related sets for single or multi-object selection."""
+
+        return maya_sets.get_related_sets_for_selection(selection=selection, require_all=require_all)
