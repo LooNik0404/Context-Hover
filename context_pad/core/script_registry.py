@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from context_pad.config import DEFAULT_CONFIG
+from context_pad.config import DEFAULT_CONFIG, PACKAGE_ROOT
 
 _ALLOWED_ACTION_TYPES = {"python_inline", "python_file", "mel_inline", "mel_file"}
 
@@ -141,20 +141,25 @@ class ScriptRegistry:
         return True
 
     def _resolve_manifest_path(self, path: str | Path | None) -> Path:
-        """Resolve manifest path using config root and package-relative fallback."""
+        """Resolve manifest path across cwd, package-root, and scripts-root forms."""
 
         if path is None:
             return DEFAULT_CONFIG.manifest_root / DEFAULT_CONFIG.manifest_filename
 
         candidate = Path(path).expanduser()
-        if candidate.is_absolute() or candidate.exists():
+        if candidate.is_absolute():
             return candidate
 
-        package_relative = DEFAULT_CONFIG.manifest_root.parent / candidate
-        if package_relative.exists():
-            return package_relative
+        search_paths = [
+            candidate,
+            PACKAGE_ROOT / candidate,
+            PACKAGE_ROOT.parent / candidate,
+        ]
+        for item in search_paths:
+            if item.exists():
+                return item
 
-        return candidate
+        return PACKAGE_ROOT / candidate
 
     def get_categories(self) -> List[Dict[str, Any]]:
         """Return categories in stable sorted order."""
