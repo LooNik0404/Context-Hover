@@ -68,7 +68,13 @@ class LauncherBase(QtWidgets.QWidget):
         content_layout.addWidget(self._divider)
 
         self._command_grid = CommandGrid(columns=2)
-        content_layout.addWidget(self._command_grid, 1)
+        self._command_scroll = QtWidgets.QScrollArea()
+        self._command_scroll.setWidgetResizable(True)
+        self._command_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self._command_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self._command_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self._command_scroll.setWidget(self._command_grid)
+        content_layout.addWidget(self._command_scroll, 1)
 
     def set_left_widget(self, widget: QtWidgets.QWidget) -> None:
         """Replace left column widget with a custom widget."""

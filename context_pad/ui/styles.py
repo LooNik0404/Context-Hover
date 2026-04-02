@@ -60,6 +60,29 @@ def launcher_stylesheet() -> str:
         padding: 6px;
         text-align: center;
     }
+    QScrollArea {
+        background: transparent;
+        border: none;
+    }
+    QScrollBar:vertical {
+        background: rgba(255, 255, 255, 12);
+        width: 8px;
+        margin: 2px;
+        border-radius: 4px;
+    }
+    QScrollBar::handle:vertical {
+        background: rgba(210, 220, 235, 70);
+        min-height: 20px;
+        border-radius: 4px;
+    }
+    QScrollBar::add-line:vertical,
+    QScrollBar::sub-line:vertical {
+        height: 0px;
+    }
+    QScrollBar::add-page:vertical,
+    QScrollBar::sub-page:vertical {
+        background: transparent;
+    }
     QFrame#ContextPadUtilityBar {
         background: transparent;
         border: none;
