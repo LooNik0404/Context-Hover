@@ -16,6 +16,8 @@ class CommandGrid(QtWidgets.QWidget):
         """Initialize the command grid."""
 
         super().__init__(parent)
+        self.setAutoFillBackground(False)
+        self.setStyleSheet("background: transparent;")
         self._buttons: List[Dict[str, str]] = []
         self._columns = max(1, columns)
 

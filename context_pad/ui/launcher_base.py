@@ -73,6 +73,9 @@ class LauncherBase(QtWidgets.QWidget):
         self._command_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
         self._command_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self._command_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self._command_scroll.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
+        self._command_scroll.viewport().setAutoFillBackground(False)
+        self._command_scroll.viewport().setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
         self._command_scroll.setWidget(self._command_grid)
         content_layout.addWidget(self._command_scroll, 1)
 
