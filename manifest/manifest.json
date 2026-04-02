@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "categories": [
+    {"id": "anim", "label": "Animation", "color": "#5D82A8", "sort_order": 10},
+    {"id": "rig", "label": "Rigging", "color": "#6E8F66", "sort_order": 20},
+    {"id": "util", "label": "Utilities", "color": "#7A70A3", "sort_order": 30}
+  ],
+  "submenus": [
+    {"id": "bake_tools", "label": "Bake Tools"}
+  ],
+  "buttons": [
+    {
+      "id": "btn_bake_keys",
+      "label": "Bake Keys",
+      "category_id": "anim",
+      "color": "#5D82A8",
+      "action_type": "python_inline",
+      "source": "print('Bake Keys placeholder')",
+      "tooltip": "Bake selected controls.",
+      "sort_order": 10,
+      "submenu_id": "bake_tools"
+    },
+    {
+      "id": "btn_mirror_pose",
+      "label": "Mirror Pose",
+      "category_id": "anim",
+      "color": "#6E95BC",
+      "action_type": "python_file",
+      "source": "scripts/mirror_pose.py",
+      "tooltip": "Mirror current pose.",
+      "sort_order": 20
+    },
+    {
+      "id": "btn_select_ctrls",
+      "label": "Select Ctrls",
+      "category_id": "rig",
+      "color": "#6B8F66",
+      "action_type": "python_inline",
+      "source": "print('Select controls placeholder')",
+      "tooltip": "Select rig controls.",
+      "sort_order": 10
+    },
+    {
+      "id": "btn_zero_ctrls",
+      "label": "Zero Ctrls",
+      "category_id": "rig",
+      "color": "#7EA178",
+      "action_type": "python_file",
+      "source": "scripts/zero_ctrls.py",
+      "tooltip": "Zero selected controls.",
+      "sort_order": 20
+    },
+    {
+      "id": "btn_toggle_hud",
+      "label": "Toggle HUD",
+      "category_id": "util",
+      "color": "#746A96",
+      "action_type": "mel_inline",
+      "source": "print \"Toggle HUD placeholder\\n\";",
+      "tooltip": "Toggle viewport HUD.",
+      "sort_order": 10
+    },
+    {
+      "id": "btn_frame_sel",
+      "label": "Frame Sel",
+      "category_id": "util",
+      "color": "#887CB0",
+      "action_type": "mel_file",
+      "source": "scripts/frame_sel.mel",
+      "tooltip": "Frame selected objects.",
+      "sort_order": 20
+    }
+  ]
+}

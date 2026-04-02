@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "categories": [
+    {"id": "anim", "label": "Animation", "sort_order": 10}
+  ],
+  "buttons": [
+    {
+      "id": "btn_broken",
+      "label": "Broken",
+      "category_id": "missing_category",
+      "color": "#FFFFFF",
+      "action_type": "python_magic",
+      "source": "print('broken')",
+      "tooltip": "This entry is intentionally invalid.",
+      "sort_order": 10
+    }
+  ]
+}
