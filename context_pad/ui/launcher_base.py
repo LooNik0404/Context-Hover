@@ -34,7 +34,7 @@ class LauncherBase(QtWidgets.QWidget):
         self._body = QtWidgets.QFrame()
         self._body.setObjectName("ContextPadBody")
         self._body.setStyleSheet(launcher_stylesheet())
-        self._body.setFixedSize(400, 308)
+        self._body.setFixedSize(372, 308)
         root_layout.addWidget(self._body)
 
         body_layout = QtWidgets.QVBoxLayout(self._body)

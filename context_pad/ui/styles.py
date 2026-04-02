@@ -40,12 +40,11 @@ def launcher_stylesheet() -> str:
         border-radius: 6px;
         color: rgb(220, 223, 228);
         padding: 5px 6px;
-        text-align: left;
+        text-align: center;
     }
-    QPushButton#ContextPadRailButton:checked {
-        background: rgba(130, 160, 205, 75);
-        border: 1px solid rgba(160, 190, 235, 60);
-        color: rgb(240, 243, 248);
+    QPushButton#ContextPadRailButton:hover {
+        background: rgba(130, 160, 205, 48);
+        border: 1px solid rgba(160, 190, 235, 44);
     }
     QFrame#ContextPadDivider {
         background: rgba(255, 255, 255, 24);
@@ -56,10 +55,10 @@ def launcher_stylesheet() -> str:
     QPushButton#ContextPadRelatedButton {
         border: 1px solid rgba(255, 255, 255, 24);
         border-radius: 8px;
-        font-size: 10px;
+        font-size: 12px;
         font-weight: 600;
         padding: 6px;
-        text-align: left;
+        text-align: center;
     }
     QFrame#ContextPadUtilityBar {
         background: transparent;

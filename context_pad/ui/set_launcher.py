@@ -17,7 +17,7 @@ class SetLauncher(LauncherBase):
         self.set_button_columns(2)
 
         related_widget = RelatedSetsList()
-        related_widget.related_selected.connect(self._command_grid.filter_by_category)
+        related_widget.related_selected.connect(self._on_related_clicked)
         self.set_left_widget(related_widget)
 
         related_widget.set_related_sets(
@@ -38,3 +38,10 @@ class SetLauncher(LauncherBase):
                 {"id": "set_6", "name": "Props", "category_id": "all", "color": "#788977"},
             ]
         )
+
+
+    def _on_related_clicked(self, related_id: str) -> None:
+        """Handle related-set click as a quick action and collapse launcher."""
+
+        _ = related_id
+        self.close()

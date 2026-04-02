@@ -44,15 +44,13 @@ class RelatedSetsList(QtWidgets.QWidget):
         for index, record in enumerate(records):
             button = QtWidgets.QPushButton(record.get("name", "Set"))
             button.setObjectName("ContextPadRailButton")
-            button.setCheckable(True)
+            button.setCheckable(False)
+            button.setFocusPolicy(QtCore.Qt.NoFocus)
+            button.setMinimumHeight(26)
             button.clicked.connect(lambda _=False, rid=record.get("id", ""): self.related_selected.emit(rid))
             self._rail.addWidget(button)
             self._buttons.append(button)
-            if index == 0:
-                button.setChecked(True)
 
         has_records = bool(records)
         self._label.setVisible(has_records)
         self.setVisible(True)
-        if has_records:
-            self.related_selected.emit(records[0].get("id", ""))
