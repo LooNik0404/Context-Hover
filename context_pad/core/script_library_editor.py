@@ -141,20 +141,31 @@ class ScriptLibraryEditor:
         buttons[:] = [item for item in buttons if item.get("id") != button_id]
         return len(buttons) != before
 
-    def move_button(self, button_id: str, direction: int) -> bool:
+    def move_button(self, button_id: str, direction: int, category_id: str | None = None) -> bool:
         """Move button up/down by swapping sort_order with adjacent item."""
 
-        buttons = self.buttons()
-        ids = [item.get("id") for item in buttons]
+        ordered = self.buttons()
+        if category_id:
+            ordered = [item for item in ordered if item.get("category_id") == category_id]
+
+        ids = [item.get("id") for item in ordered]
         if button_id not in ids:
             return False
+
         index = ids.index(button_id)
         target = index + direction
-        if target < 0 or target >= len(buttons):
+        if target < 0 or target >= len(ordered):
             return False
 
-        buttons[index]["sort_order"], buttons[target]["sort_order"] = buttons[target]["sort_order"], buttons[index]["sort_order"]
-        self._data["buttons"] = buttons
+        current_id = str(ordered[index].get("id", ""))
+        target_id = str(ordered[target].get("id", ""))
+
+        current = self._find_by_id(self._data.get("buttons", []), current_id)
+        neighbor = self._find_by_id(self._data.get("buttons", []), target_id)
+        if not current or not neighbor:
+            return False
+
+        current["sort_order"], neighbor["sort_order"] = neighbor.get("sort_order", 1000), current.get("sort_order", 1000)
         return True
 
     def _next_id(self, prefix: str, ids: List[str]) -> str:

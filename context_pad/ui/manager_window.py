@@ -1,4 +1,4 @@
-"""Manager window for editing script library and scene set launcher metadata."""
+"""Manager window for editing script buttons in a Maya-friendly workflow."""
 
 from __future__ import annotations
 
@@ -6,249 +6,295 @@ from typing import Any, Dict, List, Optional
 
 from context_pad.core.app_state import AppState
 from context_pad.core.script_library_editor import ScriptLibraryEditor
-from context_pad.core.set_registry import SetRegistry
 from context_pad.maya_integration.qt_helpers import QtCore, QtWidgets
 from context_pad.ui.widgets.color_picker import ColorPicker
 
 
 class ManagerWindow(QtWidgets.QMainWindow):
-    """Main manager window for Context Pad configuration."""
+    """Two-tab manager focused on script button setup and code editing."""
 
     def __init__(self, app_state: AppState, parent: QtWidgets.QWidget | None = None) -> None:
-        """Initialize manager window and editor widgets."""
-
         super().__init__(parent)
         self._app_state = app_state
         self._editor = ScriptLibraryEditor()
-        self._sets = SetRegistry()
         self._active_button_id: Optional[str] = None
 
-        self.setWindowTitle("Context Pad Manager")
-        self.resize(980, 680)
+        self.setWindowTitle("Context Pad Library Manager")
+        self.resize(1020, 720)
 
         container = QtWidgets.QWidget(self)
         self.setCentralWidget(container)
         root = QtWidgets.QVBoxLayout(container)
 
+        self._tabs = QtWidgets.QTabWidget()
+        self._tabs.addTab(self._build_button_setup_tab(), "Button Setup")
+        self._tabs.addTab(self._build_code_editor_tab(), "Code Editor")
+
         self._status = QtWidgets.QLabel("Ready")
 
-        root.addWidget(self._build_script_section(), 2)
-        root.addWidget(self._build_set_section(), 1)
+        root.addWidget(self._tabs)
         root.addWidget(self._status)
 
         self._refresh_all()
 
-    def _build_script_section(self) -> QtWidgets.QWidget:
-        """Build script categories/buttons edit section."""
+    def _build_button_setup_tab(self) -> QtWidgets.QWidget:
+        tab = QtWidgets.QWidget()
+        layout = QtWidgets.QHBoxLayout(tab)
+        layout.setSpacing(12)
 
-        box = QtWidgets.QGroupBox("Scripts")
-        layout = QtWidgets.QHBoxLayout(box)
+        layout.addWidget(self._build_categories_panel(), 1)
+        layout.addWidget(self._build_buttons_panel(), 1)
+        layout.addWidget(self._build_basic_properties_panel(), 1)
+        return tab
 
-        # Categories panel
-        cat_panel = QtWidgets.QVBoxLayout()
+    def _build_categories_panel(self) -> QtWidgets.QWidget:
+        panel = QtWidgets.QGroupBox("Categories")
+        layout = QtWidgets.QVBoxLayout(panel)
+
         self._category_list = QtWidgets.QListWidget()
         self._category_list.currentItemChanged.connect(self._on_category_changed)
-        cat_panel.addWidget(QtWidgets.QLabel("Script Categories"))
-        cat_panel.addWidget(self._category_list)
+        layout.addWidget(self._category_list)
 
-        cat_buttons = QtWidgets.QHBoxLayout()
-        btn_cat_add = QtWidgets.QPushButton("Add")
-        btn_cat_rename = QtWidgets.QPushButton("Rename")
-        btn_cat_delete = QtWidgets.QPushButton("Delete")
-        btn_cat_up = QtWidgets.QPushButton("↑")
-        btn_cat_down = QtWidgets.QPushButton("↓")
-        btn_cat_add.clicked.connect(self._add_category)
-        btn_cat_rename.clicked.connect(self._rename_category)
-        btn_cat_delete.clicked.connect(self._delete_category)
-        btn_cat_up.clicked.connect(lambda: self._move_category(-1))
-        btn_cat_down.clicked.connect(lambda: self._move_category(1))
-        for widget in [btn_cat_add, btn_cat_rename, btn_cat_delete, btn_cat_up, btn_cat_down]:
-            cat_buttons.addWidget(widget)
-        cat_panel.addLayout(cat_buttons)
+        toolbar = QtWidgets.QHBoxLayout()
+        toolbar.setSpacing(6)
+        btn_add = QtWidgets.QPushButton("Add")
+        btn_rename = QtWidgets.QPushButton("Rename")
+        btn_delete = QtWidgets.QPushButton("Delete")
+        btn_up = QtWidgets.QPushButton("Move Up")
+        btn_down = QtWidgets.QPushButton("Move Down")
 
-        # Buttons panel
-        btn_panel = QtWidgets.QVBoxLayout()
+        btn_add.clicked.connect(self._add_category)
+        btn_rename.clicked.connect(self._rename_category)
+        btn_delete.clicked.connect(self._delete_category)
+        btn_up.clicked.connect(lambda: self._move_category(-1))
+        btn_down.clicked.connect(lambda: self._move_category(1))
+
+        for widget in [btn_add, btn_rename, btn_delete, btn_up, btn_down]:
+            toolbar.addWidget(widget)
+        layout.addLayout(toolbar)
+        return panel
+
+    def _build_buttons_panel(self) -> QtWidgets.QWidget:
+        panel = QtWidgets.QGroupBox("Buttons")
+        layout = QtWidgets.QVBoxLayout(panel)
+
         self._button_list = QtWidgets.QListWidget()
         self._button_list.currentItemChanged.connect(self._on_button_changed)
-        btn_panel.addWidget(QtWidgets.QLabel("Script Buttons"))
-        btn_panel.addWidget(self._button_list)
+        layout.addWidget(self._button_list)
 
-        btn_controls = QtWidgets.QHBoxLayout()
+        toolbar = QtWidgets.QHBoxLayout()
+        toolbar.setSpacing(6)
         btn_add = QtWidgets.QPushButton("Add")
+        btn_rename = QtWidgets.QPushButton("Rename")
         btn_delete = QtWidgets.QPushButton("Delete")
-        btn_up = QtWidgets.QPushButton("↑")
-        btn_down = QtWidgets.QPushButton("↓")
+        btn_up = QtWidgets.QPushButton("Move Up")
+        btn_down = QtWidgets.QPushButton("Move Down")
+
         btn_add.clicked.connect(self._add_button)
+        btn_rename.clicked.connect(self._rename_button)
         btn_delete.clicked.connect(self._delete_button)
         btn_up.clicked.connect(lambda: self._move_button(-1))
         btn_down.clicked.connect(lambda: self._move_button(1))
-        for widget in [btn_add, btn_delete, btn_up, btn_down]:
-            btn_controls.addWidget(widget)
-        btn_panel.addLayout(btn_controls)
 
-        # Edit form
-        form_panel = QtWidgets.QFormLayout()
-        self._field_label = QtWidgets.QLineEdit()
-        self._field_tooltip = QtWidgets.QLineEdit()
-        self._field_source = QtWidgets.QLineEdit()
-        self._field_lang = QtWidgets.QComboBox()
-        self._field_lang.addItems(["python_inline", "python_file", "mel_inline", "mel_file"])
-        self._field_color = ColorPicker()
+        for widget in [btn_add, btn_rename, btn_delete, btn_up, btn_down]:
+            toolbar.addWidget(widget)
+        layout.addLayout(toolbar)
+        return panel
 
-        btn_apply = QtWidgets.QPushButton("Apply Button Changes")
-        btn_save = QtWidgets.QPushButton("Save Manifest")
-        btn_reload = QtWidgets.QPushButton("Reload Manifest")
+    def _build_basic_properties_panel(self) -> QtWidgets.QWidget:
+        panel = QtWidgets.QGroupBox("Basic Button Properties")
+        form = QtWidgets.QFormLayout(panel)
+
+        self._prop_name = QtWidgets.QLineEdit()
+        self._prop_category = QtWidgets.QComboBox()
+        self._prop_color = ColorPicker()
+
+        btn_apply = QtWidgets.QPushButton("Apply Properties")
+        btn_apply.clicked.connect(self._apply_properties)
+
+        form.addRow("Button Name", self._prop_name)
+        form.addRow("Category", self._prop_category)
+        form.addRow("Color", self._prop_color)
+        form.addRow(btn_apply)
+        return panel
+
+    def _build_code_editor_tab(self) -> QtWidgets.QWidget:
+        tab = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(tab)
+
+        header = QtWidgets.QHBoxLayout()
+        self._selection_label = QtWidgets.QLabel("Select a button in Button Setup")
+        self._selection_swatch = QtWidgets.QLabel()
+        self._selection_swatch.setFixedSize(16, 16)
+        self._selection_swatch.setStyleSheet("background:#6B7280; border:1px solid rgba(255,255,255,70); border-radius:3px;")
+        header.addWidget(QtWidgets.QLabel("Current Selection:"))
+        header.addWidget(self._selection_label, 1)
+        header.addWidget(self._selection_swatch)
+        layout.addLayout(header)
+
+        language_row = QtWidgets.QHBoxLayout()
+        self._code_language = QtWidgets.QComboBox()
+        self._code_language.addItems(["Python", "MEL"])
+        language_row.addWidget(QtWidgets.QLabel("Language"))
+        language_row.addWidget(self._code_language)
+        language_row.addStretch(1)
+        layout.addLayout(language_row)
+
+        self._code_editor = QtWidgets.QPlainTextEdit()
+        self._code_editor.setPlaceholderText("Write script code here...")
+        layout.addWidget(self._code_editor, 1)
+
+        tooltip_row = QtWidgets.QFormLayout()
+        self._code_tooltip = QtWidgets.QLineEdit()
+        tooltip_row.addRow("Tooltip", self._code_tooltip)
+        layout.addLayout(tooltip_row)
+
+        action_row = QtWidgets.QHBoxLayout()
+        btn_apply = QtWidgets.QPushButton("Apply")
+        btn_save = QtWidgets.QPushButton("Save Library")
+        btn_reload = QtWidgets.QPushButton("Reload Library")
         btn_apply.clicked.connect(self._apply_button_changes)
-        btn_save.clicked.connect(self._save_manifest)
-        btn_reload.clicked.connect(self._reload_manifest)
+        btn_save.clicked.connect(self._save_library)
+        btn_reload.clicked.connect(self._reload_library)
 
-        form_panel.addRow("Label", self._field_label)
-        form_panel.addRow("Tooltip", self._field_tooltip)
-        form_panel.addRow("Action Type", self._field_lang)
-        form_panel.addRow("Source (code/file)", self._field_source)
-        form_panel.addRow("Color", self._field_color)
-        form_panel.addRow(btn_apply)
-        form_panel.addRow(btn_save, btn_reload)
+        action_row.addWidget(btn_apply)
+        action_row.addStretch(1)
+        action_row.addWidget(btn_save)
+        action_row.addWidget(btn_reload)
+        layout.addLayout(action_row)
 
-        layout.addLayout(cat_panel, 1)
-        layout.addLayout(btn_panel, 1)
-        layout.addLayout(form_panel, 1)
-        return box
-
-    def _build_set_section(self) -> QtWidgets.QWidget:
-        """Build scene set overview and metadata edit controls."""
-
-        box = QtWidgets.QGroupBox("Scene Sets")
-        layout = QtWidgets.QVBoxLayout(box)
-
-        self._set_list = QtWidgets.QListWidget()
-        self._set_list.currentItemChanged.connect(self._on_set_changed)
-        layout.addWidget(self._set_list)
-
-        form = QtWidgets.QFormLayout()
-        self._set_order = QtWidgets.QSpinBox()
-        self._set_order.setRange(0, 99999)
-        self._set_group = QtWidgets.QLineEdit()
-        self._set_hidden = QtWidgets.QCheckBox("Hidden in launcher")
-        self._set_color = ColorPicker()
-
-        form.addRow("Display order", self._set_order)
-        form.addRow("Group", self._set_group)
-        form.addRow("Color", self._set_color)
-        form.addRow(self._set_hidden)
-
-        btn_row = QtWidgets.QHBoxLayout()
-        btn_refresh = QtWidgets.QPushButton("Refresh Sets")
-        btn_apply = QtWidgets.QPushButton("Apply Set Metadata")
-        btn_refresh.clicked.connect(self._refresh_sets)
-        btn_apply.clicked.connect(self._apply_set_metadata)
-        btn_row.addWidget(btn_refresh)
-        btn_row.addWidget(btn_apply)
-
-        layout.addLayout(form)
-        layout.addLayout(btn_row)
-        return box
+        hint = QtWidgets.QLabel(
+            "Scene set creation and set maintenance stay in the Set Launcher hover UI."
+        )
+        hint.setStyleSheet("color: rgba(230,230,230,170);")
+        layout.addWidget(hint)
+        return tab
 
     def _refresh_all(self) -> None:
-        """Refresh categories, buttons, and sets from services."""
-
         self._editor.reload()
         self._refresh_categories()
+        self._refresh_category_dropdown()
         self._refresh_buttons()
-        self._refresh_sets()
+        self._sync_selection_views()
 
     def _refresh_categories(self) -> None:
-        """Reload category list UI."""
-
+        selected = self._current_category_id()
         self._category_list.clear()
         for item in self._editor.categories():
-            row = QtWidgets.QListWidgetItem(f"{item['label']} ({item['id']})")
+            row = QtWidgets.QListWidgetItem(item["label"])
             row.setData(QtCore.Qt.UserRole, item["id"])
             self._category_list.addItem(row)
+            if selected and item["id"] == selected:
+                self._category_list.setCurrentItem(row)
+        if self._category_list.count() and not self._category_list.currentItem():
+            self._category_list.setCurrentRow(0)
+
+    def _refresh_category_dropdown(self) -> None:
+        selected_category_id = self._current_category_id()
+        self._prop_category.blockSignals(True)
+        self._prop_category.clear()
+        for item in self._editor.categories():
+            self._prop_category.addItem(item["label"], item["id"])
+            if item["id"] == selected_category_id:
+                self._prop_category.setCurrentIndex(self._prop_category.count() - 1)
+        self._prop_category.blockSignals(False)
 
     def _refresh_buttons(self) -> None:
-        """Reload button list UI filtered by current category."""
-
+        selected_button = self._active_button_id
         self._button_list.clear()
-        category_id = self._current_category_id()
-        for item in self._editor.buttons():
-            if category_id and item.get("category_id") != category_id:
-                continue
-            row = QtWidgets.QListWidgetItem(f"{item['label']} ({item['action_type']})")
-            row.setData(QtCore.Qt.UserRole, item["id"])
+        for item in self._buttons_for_current_category():
+            row = QtWidgets.QListWidgetItem(item.get("label", "Unnamed"))
+            row.setData(QtCore.Qt.UserRole, item.get("id", ""))
             self._button_list.addItem(row)
+            if selected_button and item.get("id") == selected_button:
+                self._button_list.setCurrentItem(row)
 
-    def _refresh_sets(self) -> None:
-        """Reload scene sets and metadata list."""
+        if self._button_list.count() and not self._button_list.currentItem():
+            self._button_list.setCurrentRow(0)
+        elif self._button_list.count() == 0:
+            self._active_button_id = None
 
-        self._set_list.clear()
-        state = self._sets.refresh_scene_set_ui_state()
-        for set_name in self._sets.list_scene_sets():
-            meta = state.get(set_name, {})
-            row = QtWidgets.QListWidgetItem(
-                f"{set_name} | order:{meta.get('display_order', 1000)} | group:{meta.get('group', 'Default')}"
-            )
-            row.setData(QtCore.Qt.UserRole, set_name)
-            self._set_list.addItem(row)
+    def _buttons_for_current_category(self) -> List[Dict[str, Any]]:
+        category_id = self._current_category_id()
+        return [item for item in self._editor.buttons() if item.get("category_id") == category_id]
 
     def _current_category_id(self) -> str:
-        """Return selected category id or empty string."""
-
         item = self._category_list.currentItem()
         return str(item.data(QtCore.Qt.UserRole)) if item else ""
 
     def _current_button_id(self) -> str:
-        """Return selected button id or empty string."""
-
         item = self._button_list.currentItem()
         return str(item.data(QtCore.Qt.UserRole)) if item else ""
 
-    def _on_category_changed(self, *_: Any) -> None:
-        """Handle category selection changes."""
+    def _selected_button(self) -> Optional[Dict[str, Any]]:
+        button_id = self._active_button_id or self._current_button_id()
+        if not button_id:
+            return None
+        return next((item for item in self._editor.buttons() if item.get("id") == button_id), None)
 
+    def _category_label(self, category_id: str) -> str:
+        category = next((item for item in self._editor.categories() if item.get("id") == category_id), None)
+        return category.get("label", "Unknown") if category else "Unknown"
+
+    def _sync_selection_views(self) -> None:
+        button = self._selected_button()
+        has_selection = button is not None
+
+        self._prop_name.setEnabled(has_selection)
+        self._prop_category.setEnabled(has_selection)
+        self._prop_color.setEnabled(has_selection)
+        self._code_language.setEnabled(has_selection)
+        self._code_editor.setEnabled(has_selection)
+        self._code_tooltip.setEnabled(has_selection)
+
+        if not button:
+            self._prop_name.clear()
+            self._code_editor.clear()
+            self._code_tooltip.clear()
+            self._selection_label.setText("Select a button in Button Setup")
+            self._selection_swatch.setStyleSheet(
+                "background:#6B7280; border:1px solid rgba(255,255,255,70); border-radius:3px;"
+            )
+            return
+
+        label = button.get("label", "Unnamed")
+        category_id = button.get("category_id", "")
+        category_label = self._category_label(category_id)
+        color = button.get("color", "#6B7280")
+        action_type = button.get("action_type", "python_inline")
+
+        self._prop_name.setText(label)
+        self._prop_color.set_color(color)
+        self._prop_category.setCurrentIndex(max(0, self._prop_category.findData(category_id)))
+
+        self._selection_label.setText(f"{category_label} > {label}")
+        self._selection_swatch.setStyleSheet(
+            f"background:{color}; border:1px solid rgba(255,255,255,70); border-radius:3px;"
+        )
+
+        self._code_language.setCurrentText("Python" if action_type.startswith("python") else "MEL")
+        self._code_editor.setPlainText(button.get("source", ""))
+        self._code_tooltip.setText(button.get("tooltip", ""))
+
+    def _on_category_changed(self, *_: Any) -> None:
         self._refresh_buttons()
+        self._refresh_category_dropdown()
+        self._sync_selection_views()
 
     def _on_button_changed(self, *_: Any) -> None:
-        """Populate button form from selected button."""
-
-        button_id = self._current_button_id()
-        self._active_button_id = button_id or None
-        item = next((b for b in self._editor.buttons() if b.get("id") == button_id), None)
-        if not item:
-            return
-
-        self._field_label.setText(item.get("label", ""))
-        self._field_tooltip.setText(item.get("tooltip", ""))
-        self._field_source.setText(item.get("source", ""))
-        self._field_lang.setCurrentText(item.get("action_type", "python_inline"))
-        self._field_color.set_color(item.get("color", "#6B7280"))
-
-    def _on_set_changed(self, *_: Any) -> None:
-        """Populate set metadata form from selected set."""
-
-        item = self._set_list.currentItem()
-        if not item:
-            return
-
-        set_name = str(item.data(QtCore.Qt.UserRole))
-        state = self._sets.refresh_scene_set_ui_state().get(set_name, {})
-        self._set_order.setValue(int(state.get("display_order", 1000)))
-        self._set_group.setText(str(state.get("group", "Default")))
-        self._set_color.set_color(str(state.get("button_color", "#6B7280")))
-        self._set_hidden.setChecked(bool(state.get("hidden_state", False)))
+        self._active_button_id = self._current_button_id() or None
+        self._sync_selection_views()
 
     def _add_category(self) -> None:
-        """Add a new category from input dialog."""
-
         text, ok = QtWidgets.QInputDialog.getText(self, "Add Category", "Category name")
         if not ok or not text.strip():
             return
         self._editor.add_category(text.strip())
         self._refresh_categories()
+        self._refresh_category_dropdown()
+        self._status.setText("Category added")
 
     def _rename_category(self) -> None:
-        """Rename selected category."""
-
         category_id = self._current_category_id()
         if not category_id:
             return
@@ -257,119 +303,130 @@ class ManagerWindow(QtWidgets.QMainWindow):
             return
         self._editor.rename_category(category_id, text.strip())
         self._refresh_categories()
+        self._refresh_category_dropdown()
+        self._sync_selection_views()
+        self._status.setText("Category renamed")
 
     def _delete_category(self) -> None:
-        """Delete selected category and linked buttons."""
-
         category_id = self._current_category_id()
         if not category_id:
             return
         self._editor.delete_category(category_id)
         self._refresh_categories()
+        self._refresh_category_dropdown()
         self._refresh_buttons()
+        self._sync_selection_views()
+        self._status.setText("Category deleted")
 
     def _move_category(self, direction: int) -> None:
-        """Move selected category up or down."""
-
         category_id = self._current_category_id()
         if not category_id:
             return
         self._editor.move_category(category_id, direction)
         self._refresh_categories()
+        self._refresh_category_dropdown()
+        self._status.setText("Category moved")
 
     def _add_button(self) -> None:
-        """Add a button using current form values."""
-
         category_id = self._current_category_id()
         if not category_id:
             self._status.setText("Select a category first")
             return
 
+        label, ok = QtWidgets.QInputDialog.getText(self, "Add Button", "Button name")
+        if not ok:
+            return
         self._editor.add_button(
             {
-                "label": self._field_label.text().strip() or "New Button",
-                "tooltip": self._field_tooltip.text().strip(),
-                "action_type": self._field_lang.currentText(),
-                "source": self._field_source.text(),
-                "color": self._field_color.color(),
+                "label": label.strip() or "New Button",
                 "category_id": category_id,
+                "color": "#6B7280",
+                "action_type": "python_inline",
+                "source": "",
+                "tooltip": "",
             }
         )
         self._refresh_buttons()
+        self._active_button_id = self._current_button_id() or self._active_button_id
+        self._sync_selection_views()
+        self._status.setText("Button added")
 
-    def _apply_button_changes(self) -> None:
-        """Apply edits to currently selected button."""
-
-        if not self._active_button_id:
-            self._status.setText("Select a button to edit")
+    def _rename_button(self) -> None:
+        button = self._selected_button()
+        if not button:
             return
-
-        ok = self._editor.update_button(
-            self._active_button_id,
-            {
-                "label": self._field_label.text().strip(),
-                "tooltip": self._field_tooltip.text().strip(),
-                "action_type": self._field_lang.currentText(),
-                "source": self._field_source.text(),
-                "color": self._field_color.color(),
-            },
-        )
-        if ok:
-            self._status.setText("Button updated")
-            self._refresh_buttons()
+        text, ok = QtWidgets.QInputDialog.getText(self, "Rename Button", "New button name", text=button.get("label", ""))
+        if not ok or not text.strip():
+            return
+        self._editor.update_button(button["id"], {"label": text.strip()})
+        self._refresh_buttons()
+        self._sync_selection_views()
+        self._status.setText("Button renamed")
 
     def _delete_button(self) -> None:
-        """Delete currently selected button."""
-
         button_id = self._current_button_id()
         if not button_id:
             return
         self._editor.delete_button(button_id)
+        self._active_button_id = None
         self._refresh_buttons()
+        self._sync_selection_views()
+        self._status.setText("Button deleted")
 
     def _move_button(self, direction: int) -> None:
-        """Move selected button up or down."""
-
         button_id = self._current_button_id()
-        if not button_id:
+        category_id = self._current_category_id()
+        if not button_id or not category_id:
             return
-        self._editor.move_button(button_id, direction)
+        self._editor.move_button(button_id, direction, category_id=category_id)
         self._refresh_buttons()
+        self._status.setText("Button moved")
 
-    def _save_manifest(self) -> None:
-        """Validate and save manifest edits to disk."""
+    def _apply_properties(self) -> None:
+        button = self._selected_button()
+        if not button:
+            self._status.setText("Select a button first")
+            return
 
+        category_id = str(self._prop_category.currentData() or button.get("category_id", ""))
+        payload = {
+            "label": self._prop_name.text().strip() or button.get("label", "Button"),
+            "category_id": category_id,
+            "color": self._prop_color.color(),
+        }
+        self._editor.update_button(button["id"], payload)
+        self._refresh_buttons()
+        self._sync_selection_views()
+        self._status.setText("Properties applied")
+
+    def _apply_button_changes(self) -> None:
+        button = self._selected_button()
+        if not button:
+            self._status.setText("Select a button in Button Setup")
+            return
+
+        language = self._code_language.currentText()
+        action_type = "python_inline" if language == "Python" else "mel_inline"
+        payload = {
+            "label": self._prop_name.text().strip() or button.get("label", "Button"),
+            "category_id": str(self._prop_category.currentData() or button.get("category_id", "")),
+            "color": self._prop_color.color(),
+            "tooltip": self._code_tooltip.text().strip(),
+            "action_type": action_type,
+            "source": self._code_editor.toPlainText(),
+        }
+        self._editor.update_button(button["id"], payload)
+        self._refresh_buttons()
+        self._sync_selection_views()
+        self._status.setText("Button updated")
+
+    def _save_library(self) -> None:
         try:
             self._editor.save()
-            self._status.setText("Manifest saved")
+            self._status.setText("Library saved")
         except Exception as exc:
             self._status.setText(f"Save failed: {exc}")
 
-    def _reload_manifest(self) -> None:
-        """Reload manifest from disk and refresh lists."""
-
+    def _reload_library(self) -> None:
         self._refresh_all()
-        self._status.setText("Manifest reloaded")
-
-    def _apply_set_metadata(self) -> None:
-        """Apply metadata form values to selected scene set."""
-
-        item = self._set_list.currentItem()
-        if not item:
-            self._status.setText("Select a scene set first")
-            return
-
-        set_name = str(item.data(QtCore.Qt.UserRole))
-        state = self._sets.refresh_scene_set_ui_state()
-        state.setdefault(set_name, {})
-        state[set_name].update(
-            {
-                "display_order": self._set_order.value(),
-                "button_color": self._set_color.color(),
-                "group": self._set_group.text().strip() or "Default",
-                "hidden_state": self._set_hidden.isChecked(),
-            }
-        )
-        self._sets.save_scene_set_ui_state(state)
-        self._refresh_sets()
-        self._status.setText(f"Set metadata updated: {set_name}")
+        self._status.setText("Library reloaded")
