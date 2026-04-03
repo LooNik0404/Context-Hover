@@ -1,12 +1,30 @@
 {
   "version": 1,
   "categories": [
-    {"id": "anim", "label": "Animation", "color": "#5D82A8", "sort_order": 10},
-    {"id": "rig", "label": "Rigging", "color": "#6E8F66", "sort_order": 20},
-    {"id": "util", "label": "Utilities", "color": "#7A70A3", "sort_order": 30}
+    {
+      "id": "anim",
+      "label": "Animation",
+      "color": "#5D82A8",
+      "sort_order": 10
+    },
+    {
+      "id": "rig",
+      "label": "Rigging",
+      "color": "#6E8F66",
+      "sort_order": 20
+    },
+    {
+      "id": "util",
+      "label": "Utilities",
+      "color": "#7A70A3",
+      "sort_order": 30
+    }
   ],
   "submenus": [
-    {"id": "bake_tools", "label": "Bake Tools"}
+    {
+      "id": "bake_tools",
+      "label": "Bake Tools"
+    }
   ],
   "buttons": [
     {
@@ -25,8 +43,8 @@
       "label": "Mirror Pose",
       "category_id": "anim",
       "color": "#6E95BC",
-      "action_type": "python_file",
-      "source": "scripts/mirror_pose.py",
+      "action_type": "python_inline",
+      "source": "print('Mirror Pose placeholder')",
       "tooltip": "Mirror current pose.",
       "sort_order": 20
     },
@@ -45,8 +63,8 @@
       "label": "Zero Ctrls",
       "category_id": "rig",
       "color": "#7EA178",
-      "action_type": "python_file",
-      "source": "scripts/zero_ctrls.py",
+      "action_type": "python_inline",
+      "source": "print('Zero controls placeholder')",
       "tooltip": "Zero selected controls.",
       "sort_order": 20
     },
@@ -65,8 +83,8 @@
       "label": "Frame Sel",
       "category_id": "util",
       "color": "#887CB0",
-      "action_type": "mel_file",
-      "source": "scripts/frame_sel.mel",
+      "action_type": "mel_inline",
+      "source": "print \"Frame selected placeholder\\n\";",
       "tooltip": "Frame selected objects.",
       "sort_order": 20
     }

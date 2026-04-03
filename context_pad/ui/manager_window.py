@@ -273,7 +273,22 @@ class ManagerWindow(QtWidgets.QMainWindow):
         )
 
         self._code_language.setCurrentText("Python" if action_type.startswith("python") else "MEL")
-        self._code_editor.setPlainText(button.get("source", ""))
+        source_value = button.get("source", "")
+        if action_type.endswith("file"):
+            from pathlib import Path
+
+            file_path = Path(str(source_value)).expanduser()
+            if file_path.exists() and file_path.is_file():
+                try:
+                    source_value = file_path.read_text(encoding="utf-8")
+                    self._status.setText("Loaded file-based button source into editor. Apply converts it to inline mode.")
+                except Exception:
+                    source_value = f"# Could not read file: {file_path}"
+            else:
+                source_value = f"# Missing file path: {file_path}\n# Replace with inline script and click Apply."
+                self._status.setText("File-based button path is missing. Apply to convert to inline mode.")
+
+        self._code_editor.setPlainText(str(source_value))
         self._code_tooltip.setText(button.get("tooltip", ""))
 
     def _on_category_changed(self, *_: Any) -> None:

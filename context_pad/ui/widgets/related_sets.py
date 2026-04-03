@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from context_pad.maya_integration.qt_helpers import QtCore, QtWidgets
+from context_pad.maya_integration.qt_helpers import QtCore, QtGui, QtWidgets
 
 
 class RelatedSetsList(QtWidgets.QWidget):
@@ -42,11 +42,15 @@ class RelatedSetsList(QtWidgets.QWidget):
 
         self._buttons = []
         for record in records:
-            button = QtWidgets.QPushButton(record.get("name", "Set"))
+            raw_name = str(record.get("name", "Set"))
+            metrics = QtGui.QFontMetrics(self.font())
+            short_name = metrics.elidedText(raw_name, QtCore.Qt.ElideRight, 96)
+            button = QtWidgets.QPushButton(short_name)
             button.setObjectName("ContextPadRelatedButton")
             button.setCheckable(False)
             button.setFocusPolicy(QtCore.Qt.NoFocus)
             button.setMinimumHeight(24)
+            button.setToolTip(raw_name)
 
             color = record.get("color")
             if color:

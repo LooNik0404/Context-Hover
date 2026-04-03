@@ -114,6 +114,9 @@ def _existing_file(button_data: Dict[str, Any]) -> Path:
 
     raw_path = _required_string(button_data, "file_path")
     file_path = Path(raw_path).expanduser()
+    base_dir = str(button_data.get("manifest_dir", "")).strip()
+    if not file_path.is_absolute() and base_dir:
+        file_path = (Path(base_dir).expanduser() / file_path).resolve()
     if not file_path.exists() or not file_path.is_file():
         raise FileNotFoundError(f"file not found: {file_path}")
     return file_path

@@ -23,7 +23,7 @@ The Set Launcher is now the primary place for fast set work:
 
 - Empty selection: related rail stays hidden/minimized.
 - Single selection: shows sets containing that object.
-- Multi-selection: shows sets containing **any** selected objects.
+- Multi-selection: shows sets containing **all** selected objects.
 - Sorting:
   1. smaller sets first (more specific)
   2. then `display_order`
@@ -73,7 +73,7 @@ Set work is a rapid scene interaction task. Keeping create/rename/update/delete 
 - Open set launcher with nothing selected → only All Sets is visible or Related Sets is minimized.
 - Select one object from TailSet → Related Sets appears.
 - TailSet appears above AllCtrls_Set.
-- Select multiple objects → sets containing any selected objects remain.
+- Select multiple objects → only sets containing all selected objects remain.
 - Click plus icon with selection → a new set is created.
 - Click plus icon with empty selection → readable warning.
 - RMB on a set button → context menu appears.

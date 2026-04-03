@@ -33,6 +33,7 @@ class ScriptLauncher(LauncherBase):
         registry = ScriptRegistry()
         try:
             registry.load_manifest()
+            manifest_dir = str(registry.manifest_path().parent) if registry.manifest_path() else ""
             categories = [
                 {"id": item["id"], "name": item["label"], "color": item.get("color", "#6B7280")}
                 for item in registry.get_categories()
@@ -52,6 +53,7 @@ class ScriptLauncher(LauncherBase):
                             "tooltip": item.get("tooltip", ""),
                             "code": item["source"] if item["action_type"].endswith("inline") else "",
                             "file_path": item["source"] if item["action_type"].endswith("file") else "",
+                            "manifest_dir": manifest_dir,
                         }
                     )
 

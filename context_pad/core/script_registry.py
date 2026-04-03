@@ -109,13 +109,16 @@ class ScriptRegistry:
             "category_id",
             "color",
             "action_type",
-            "source",
-            "tooltip",
             "sort_order",
         ]
         for index, button in enumerate(buttons):
             path = f"buttons[{index}]"
             self._validate_required_fields(button, required_button_fields, path)
+
+            if "source" not in button:
+                raise ManifestValidationError(f"{path}.source is required")
+            if "tooltip" not in button:
+                raise ManifestValidationError(f"{path}.tooltip is required")
 
             button_id = str(button["id"])
             if button_id in button_ids:
@@ -187,6 +190,11 @@ class ScriptRegistry:
             for item in self._buttons
             if item.category_id == category_id
         ]
+
+    def manifest_path(self) -> Optional[Path]:
+        """Return currently loaded manifest path, if available."""
+
+        return self._manifest_path
 
     def _parse_categories(self, data: Dict[str, Any]) -> List[ScriptCategory]:
         """Parse and sort category records from manifest."""

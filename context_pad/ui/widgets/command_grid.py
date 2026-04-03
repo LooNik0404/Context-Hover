@@ -56,8 +56,11 @@ class CommandGrid(QtWidgets.QWidget):
                 widget.deleteLater()
 
         for index, item_data in enumerate(buttons):
-            button = QtWidgets.QPushButton(item_data.get("name", "Button"))
+            button_name = item_data.get("name", "Button")
+            button = QtWidgets.QPushButton(button_name)
             button.setObjectName("ContextPadCommandButton")
+            tooltip = str(item_data.get("tooltip", "")).strip()
+            button.setToolTip(tooltip or str(button_name))
 
             background = QtGui.QColor(item_data.get("color", "#4A89DC"))
             foreground = self._contrast_color(background)

@@ -157,7 +157,9 @@ class SetLauncher(LauncherBase):
     def _build_related_sets(self, state: Dict[str, dict]) -> List[Dict[str, str]]:
         """Build contextual related sets (top N) for current selection."""
 
-        related_names = self._sets.get_related_sets_for_selection(require_all=False)
+        selection = self._sets.get_current_selection()
+        require_all = len(selection) > 1
+        related_names = self._sets.get_related_sets_for_selection(selection=selection, require_all=require_all)
         if not related_names:
             return []
 
@@ -228,13 +230,20 @@ class SetLauncher(LauncherBase):
         self._context_menu_active = False
         if not ok or not new_name.strip() or new_name.strip() == old_name:
             return
-        if self._sets.rename_set(old_name, new_name.strip()):
-            state = self._sets.refresh_scene_set_ui_state()
-            if old_name in state:
-                state[new_name.strip()] = state.pop(old_name)
-                self._sets.save_scene_set_ui_state(state)
+
+        clean_name = new_name.strip()
+        state_before = self._sets.load_scene_set_ui_state()
+        cached_meta = dict(state_before.get(old_name, {}))
+
+        if self._sets.rename_set(old_name, clean_name):
+            state_after = self._sets.load_scene_set_ui_state()
+            state_after.pop(old_name, None)
+            if cached_meta:
+                state_after[clean_name] = cached_meta
+            self._sets.save_scene_set_ui_state(state_after)
+            self._sets.refresh_scene_set_ui_state()
             self.refresh_from_scene()
-            self._toast(f"Renamed: {new_name.strip()}")
+            self._toast(f"Renamed: {clean_name}")
         else:
             self._toast("Could not rename set")
 
