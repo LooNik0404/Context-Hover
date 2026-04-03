@@ -46,7 +46,7 @@ The Set Launcher is now the primary place for fast set work:
 - **RMB context menu** (launcher stays open while using menu):
   - Rename
   - Delete
-  - Change Color (limited palette)
+  - Change Color (named limited palette)
   - Update from Selection
 
 ### Fast create behavior
@@ -54,7 +54,7 @@ The Set Launcher is now the primary place for fast set work:
 - `+` creates a set from current selection.
 - Empty selection shows readable feedback.
 - Uses a quick naming flow with suggested names.
-- New sets get a random color from a fixed approved color palette.
+- New sets get an auto-assigned balanced palette color (to reduce nearby duplicates).
 
 ### Pinned refresh behavior
 
@@ -73,7 +73,7 @@ Set work is a rapid scene interaction task. Keeping create/rename/update/delete 
 - Open set launcher with nothing selected → only All Sets is visible or Related Sets is minimized.
 - Select one object from TailSet → Related Sets appears.
 - TailSet appears above AllCtrls_Set.
-- Select multiple objects → only sets containing all objects remain.
+- Select multiple objects → sets containing any selected objects remain.
 - Click plus icon with selection → a new set is created.
 - Click plus icon with empty selection → readable warning.
 - RMB on a set button → context menu appears.
@@ -91,6 +91,6 @@ A compact translucent hover launcher supports complete day-to-day set operations
 ## Known limitations of this stage
 
 - Related updates use lightweight timer polling while pinned (not Maya callback events).
-- Color choice uses a fixed quick-pick palette (no free color wheel in this stage).
+- Color choice uses a fixed named palette (no free color wheel in this stage).
 - Grouping is reflected through sort order, not dedicated visual group headers.
 - Outside Maya, set actions safely no-op.

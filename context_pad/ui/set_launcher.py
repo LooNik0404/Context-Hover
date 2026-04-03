@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import random
-from typing import Dict, List
+from collections import Counter
+from typing import Dict, List, Tuple
 
 from context_pad.core.set_registry import SetRegistry
 from context_pad.maya_integration.qt_helpers import QtCore, QtWidgets
@@ -16,15 +16,15 @@ class SetLauncher(LauncherBase):
     """Overlay launcher for fast scene-set operations."""
 
     _RELATED_LIMIT = 7
-    _SET_COLORS = [
-        "#5D82A8",
-        "#6E8F66",
-        "#7A70A3",
-        "#4A90E2",
-        "#7EA178",
-        "#887CB0",
-        "#D9822B",
-        "#6B7280",
+    _SET_COLORS: List[Tuple[str, str]] = [
+        ("Steel Blue", "#5D82A8"),
+        ("Olive Green", "#6E8F66"),
+        ("Muted Purple", "#7A70A3"),
+        ("Sky Blue", "#4A90E2"),
+        ("Moss Green", "#7EA178"),
+        ("Lavender", "#887CB0"),
+        ("Amber", "#D9822B"),
+        ("Slate Gray", "#6B7280"),
     ]
 
     def __init__(self, parent=None) -> None:
@@ -78,7 +78,7 @@ class SetLauncher(LauncherBase):
         if self._sets.create_set_from_selection(new_name):
             state = self._sets.refresh_scene_set_ui_state()
             state.setdefault(new_name, {})
-            state[new_name]["button_color"] = random.choice(self._SET_COLORS)
+            state[new_name]["button_color"] = self._choose_new_set_color(state)
             self._sets.save_scene_set_ui_state(state)
             self.refresh_from_scene()
             self._toast(f"Created set: {new_name}")
@@ -251,21 +251,26 @@ class SetLauncher(LauncherBase):
 
     def _change_set_color(self, set_name: str) -> None:
         self._context_menu_active = True
-        color, ok = QtWidgets.QInputDialog.getItem(
+        named_choices = [f"{name} ({hex_color})" for name, hex_color in self._SET_COLORS]
+        selected_label, ok = QtWidgets.QInputDialog.getItem(
             self,
             "Set Color",
             "Choose color",
-            self._SET_COLORS,
+            named_choices,
             0,
             False,
         )
         self._context_menu_active = False
-        if not ok or not color:
+        if not ok or not selected_label:
+            return
+
+        color_value = next((hex_color for name, hex_color in self._SET_COLORS if selected_label.startswith(name)), None)
+        if not color_value:
             return
 
         state = self._sets.refresh_scene_set_ui_state()
         state.setdefault(set_name, {})
-        state[set_name]["button_color"] = color
+        state[set_name]["button_color"] = color_value
         self._sets.save_scene_set_ui_state(state)
         self.refresh_from_scene()
         self._toast(f"Color updated: {set_name}")
@@ -306,6 +311,21 @@ class SetLauncher(LauncherBase):
             if candidate not in existing:
                 return candidate
             index += 1
+
+    def _choose_new_set_color(self, state: Dict[str, dict]) -> str:
+        """Choose balanced color to reduce visible neighbor duplicates."""
+
+        palette_values = [hex_color for _, hex_color in self._SET_COLORS]
+        usage = Counter(str(meta.get("button_color", "")) for meta in state.values())
+
+        all_sets = self._build_all_sets(state)
+        recent_colors = [str(item.get("color", "")) for item in all_sets[-2:]]
+
+        def score(color: str) -> Tuple[int, int]:
+            repeat_penalty = 1 if color in recent_colors else 0
+            return (usage.get(color, 0), repeat_penalty)
+
+        return sorted(palette_values, key=score)[0]
 
     def _toast(self, message: str) -> None:
         """Show lightweight user feedback near cursor."""
