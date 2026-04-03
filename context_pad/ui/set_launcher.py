@@ -157,7 +157,7 @@ class SetLauncher(LauncherBase):
     def _build_related_sets(self, state: Dict[str, dict]) -> List[Dict[str, str]]:
         """Build contextual related sets (top N) for current selection."""
 
-        related_names = self._sets.get_related_sets_for_selection(require_all=True)
+        related_names = self._sets.get_related_sets_for_selection(require_all=False)
         if not related_names:
             return []
 

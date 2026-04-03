@@ -23,7 +23,7 @@ The Set Launcher is now the primary place for fast set work:
 
 - Empty selection: related rail stays hidden/minimized.
 - Single selection: shows sets containing that object.
-- Multi-selection: shows sets containing **all** selected objects.
+- Multi-selection: shows sets containing **any** selected objects.
 - Sorting:
   1. smaller sets first (more specific)
   2. then `display_order`
