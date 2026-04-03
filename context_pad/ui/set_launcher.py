@@ -208,14 +208,17 @@ class SetLauncher(LauncherBase):
         action_update = menu.addAction("Update from Selection")
 
         selected = menu.exec_(global_pos)
-        if selected is action_rename:
-            self._rename_set(set_name)
-        elif selected is action_delete:
-            self._delete_set(set_name)
-        elif selected is action_color:
-            self._change_set_color(set_name)
-        elif selected is action_update:
-            self._update_from_selection(set_name)
+        try:
+            if selected is action_rename:
+                self._rename_set(set_name)
+            elif selected is action_delete:
+                self._delete_set(set_name)
+            elif selected is action_color:
+                self._change_set_color(set_name)
+            elif selected is action_update:
+                self._update_from_selection(set_name)
+        except Exception as exc:
+            self._log_warning(f"Set action failed for '{set_name}': {exc}")
 
         self._context_menu_active = False
 
@@ -251,7 +254,7 @@ class SetLauncher(LauncherBase):
 
     def _change_set_color(self, set_name: str) -> None:
         self._context_menu_active = True
-        named_choices = [f"{name} ({hex_color})" for name, hex_color in self._SET_COLORS]
+        named_choices = [name for name, _ in self._SET_COLORS]
         selected_label, ok = QtWidgets.QInputDialog.getItem(
             self,
             "Set Color",
@@ -264,7 +267,7 @@ class SetLauncher(LauncherBase):
         if not ok or not selected_label:
             return
 
-        color_value = next((hex_color for name, hex_color in self._SET_COLORS if selected_label.startswith(name)), None)
+        color_value = next((hex_color for name, hex_color in self._SET_COLORS if selected_label == name), None)
         if not color_value:
             return
 
@@ -289,7 +292,7 @@ class SetLauncher(LauncherBase):
         if current == self._last_selection:
             return
         self._last_selection = current
-        state = self._sets.refresh_scene_set_ui_state()
+        state = self._sets.load_scene_set_ui_state()
         self._related_widget.set_related_sets(self._build_related_sets(state))
 
     def _start_selection_watch(self) -> None:
@@ -326,6 +329,20 @@ class SetLauncher(LauncherBase):
             return (usage.get(color, 0), repeat_penalty)
 
         return sorted(palette_values, key=score)[0]
+
+
+    def _log_warning(self, message: str) -> None:
+        """Emit readable warning without crashing launcher."""
+
+        try:
+            import maya.cmds as cmds  # type: ignore
+
+            cmds.warning(f"[ContextPad:SetLauncher] {message}")
+            return
+        except Exception:
+            pass
+
+        print(f"[ContextPad:SetLauncher][WARN] {message}")
 
     def _toast(self, message: str) -> None:
         """Show lightweight user feedback near cursor."""

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 import traceback
-from typing import Any, Dict
+from typing import Any, Dict, Iterator
 
 try:
     import maya.cmds as cmds  # type: ignore
@@ -35,36 +36,37 @@ def run_button_action(button_data: Dict[str, Any]) -> bool:
         return False
 
     try:
-        if action_type == "python_inline":
-            code = _required_string(button_data, "code")
-            _log_info(f"Running Python inline action: {label}")
-            _run_python(code, source_hint=f"inline:{label}")
-            _log_info(f"Success: {label}")
-            return True
+        with _undo_chunk(label):
+            if action_type == "python_inline":
+                code = _required_string(button_data, "code")
+                _log_info(f"Running Python inline action: {label}")
+                _run_python(code, source_hint=f"inline:{label}")
+                _log_info(f"Success: {label}")
+                return True
 
-        if action_type == "python_file":
-            file_path = _existing_file(button_data)
-            _log_info(f"Running Python file action: {label} -> {file_path}")
-            _run_python(file_path.read_text(encoding="utf-8"), source_hint=str(file_path))
-            _log_info(f"Success: {label}")
-            return True
+            if action_type == "python_file":
+                file_path = _existing_file(button_data)
+                _log_info(f"Running Python file action: {label} -> {file_path}")
+                _run_python(file_path.read_text(encoding="utf-8"), source_hint=str(file_path))
+                _log_info(f"Success: {label}")
+                return True
 
-        if action_type == "mel_inline":
-            code = _required_string(button_data, "code")
-            _log_info(f"Running MEL inline action: {label}")
-            _run_mel(code)
-            _log_info(f"Success: {label}")
-            return True
+            if action_type == "mel_inline":
+                code = _required_string(button_data, "code")
+                _log_info(f"Running MEL inline action: {label}")
+                _run_mel(code)
+                _log_info(f"Success: {label}")
+                return True
 
-        if action_type == "mel_file":
-            file_path = _existing_file(button_data)
-            _log_info(f"Running MEL file action: {label} -> {file_path}")
-            _run_mel(file_path.read_text(encoding="utf-8"))
-            _log_info(f"Success: {label}")
-            return True
+            if action_type == "mel_file":
+                file_path = _existing_file(button_data)
+                _log_info(f"Running MEL file action: {label} -> {file_path}")
+                _run_mel(file_path.read_text(encoding="utf-8"))
+                _log_info(f"Success: {label}")
+                return True
 
-        _log_error(f"Unsupported action type '{action_type}' for button '{label}'")
-        return False
+            _log_error(f"Unsupported action type '{action_type}' for button '{label}'")
+            return False
 
     except Exception as exc:
         _log_error(f"Failed: {label} | {_format_exception(exc)}")
@@ -72,6 +74,31 @@ def run_button_action(button_data: Dict[str, Any]) -> bool:
             _log_error(traceback.format_exc(limit=3).strip())
         return False
 
+
+
+@contextmanager
+def _undo_chunk(label: str) -> Iterator[None]:
+    """Wrap execution in a Maya undo chunk when available."""
+
+    if cmds is None or not hasattr(cmds, "undoInfo"):
+        yield
+        return
+
+    opened = False
+    try:
+        cmds.undoInfo(openChunk=True, chunkName=f"ContextPad:{label}")
+        opened = True
+    except Exception:
+        opened = False
+
+    try:
+        yield
+    finally:
+        if opened:
+            try:
+                cmds.undoInfo(closeChunk=True)
+            except Exception:
+                pass
 
 def _required_string(button_data: Dict[str, Any], key: str) -> str:
     """Return required non-empty string field from button payload."""

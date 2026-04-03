@@ -9,6 +9,14 @@ def launch_context_pad():
     return _launch()
 
 
+def show_manager_window():
+    """Lazy import and show manager window."""
+
+    from .bootstrap import show_manager_window as _show
+
+    return _show()
+
+
 def show_script_launcher():
     """Lazy import and show script launcher."""
 
@@ -25,4 +33,4 @@ def show_set_launcher():
     return _show()
 
 
-__all__ = ["launch_context_pad", "show_script_launcher", "show_set_launcher"]
+__all__ = ["launch_context_pad", "show_manager_window", "show_script_launcher", "show_set_launcher"]

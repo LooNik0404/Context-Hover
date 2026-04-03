@@ -58,8 +58,10 @@ class ScriptLauncher(LauncherBase):
             self.set_categories(categories)
             self.set_buttons(buttons)
             return
-        except ManifestValidationError:
-            pass
+        except ManifestValidationError as exc:
+            print(f"[ContextPad:ScriptLauncher][WARN] Manifest validation failed: {exc}")
+        except Exception as exc:
+            print(f"[ContextPad:ScriptLauncher][WARN] Failed loading library: {exc}")
 
         self.set_categories(
             [
