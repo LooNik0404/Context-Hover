@@ -28,6 +28,14 @@ def list_scene_sets() -> List[str]:
     return sorted([item for item in all_sets if item not in _DEFAULT_SET_NAMES and not item.startswith("default")])
 
 
+def get_current_selection() -> List[str]:
+    """Return current scene selection as full path names."""
+
+    if cmds is None:
+        return []
+    return cmds.ls(selection=True, long=True) or []
+
+
 def select_set(name: str) -> bool:
     """Replace selection with members of the specified set."""
 

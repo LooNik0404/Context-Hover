@@ -1,4 +1,4 @@
-"""Compact related-sets button rail for set launcher context."""
+"""Compact related-sets rail for contextual shortcuts."""
 
 from __future__ import annotations
 
@@ -13,8 +13,6 @@ class RelatedSetsList(QtWidgets.QWidget):
     related_selected = QtCore.Signal(str)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
-        """Initialize related sets rail."""
-
         super().__init__(parent)
         self._buttons: List[QtWidgets.QPushButton] = []
 
@@ -31,8 +29,10 @@ class RelatedSetsList(QtWidgets.QWidget):
         layout.addLayout(self._rail)
         layout.addStretch(1)
 
+        self.setFixedWidth(108)
+
     def set_related_sets(self, records: List[Dict[str, str]]) -> None:
-        """Populate related set rail from id/name records."""
+        """Populate related set rail from id/name/color records."""
 
         while self._rail.count():
             item = self._rail.takeAt(0)
@@ -41,16 +41,21 @@ class RelatedSetsList(QtWidgets.QWidget):
                 widget.deleteLater()
 
         self._buttons = []
-        for index, record in enumerate(records):
+        for record in records:
             button = QtWidgets.QPushButton(record.get("name", "Set"))
-            button.setObjectName("ContextPadRailButton")
+            button.setObjectName("ContextPadRelatedButton")
             button.setCheckable(False)
             button.setFocusPolicy(QtCore.Qt.NoFocus)
-            button.setMinimumHeight(26)
+            button.setMinimumHeight(24)
+
+            color = record.get("color")
+            if color:
+                button.setStyleSheet(f"background-color:{color};")
+
             button.clicked.connect(lambda _=False, rid=record.get("id", ""): self.related_selected.emit(rid))
             self._rail.addWidget(button)
             self._buttons.append(button)
 
         has_records = bool(records)
         self._label.setVisible(has_records)
-        self.setVisible(True)
+        self.setVisible(has_records)

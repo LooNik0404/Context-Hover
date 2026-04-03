@@ -55,6 +55,11 @@ class SetRegistry:
 
         return maya_sets.delete_set(name)
 
+    def get_current_selection(self) -> List[str]:
+        """Return current scene selection (empty outside Maya)."""
+
+        return maya_sets.get_current_selection()
+
     def get_sets_for_object(self, node_name: str) -> List[str]:
         """Return all sets containing a node."""
 

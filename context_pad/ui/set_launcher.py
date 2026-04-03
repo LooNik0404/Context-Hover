@@ -1,47 +1,265 @@
-"""Selection set overlay launcher widget."""
+"""Selection set overlay launcher widget with contextual related sets."""
 
 from __future__ import annotations
+
+from typing import Dict, List
+
+from context_pad.core.set_registry import SetRegistry
+from context_pad.maya_integration.qt_helpers import QtCore, QtWidgets
 
 from .launcher_base import LauncherBase
 from .widgets.related_sets import RelatedSetsList
 
 
 class SetLauncher(LauncherBase):
-    """Overlay launcher displaying related and all set placeholders."""
+    """Overlay launcher for fast scene-set operations."""
+
+    _RELATED_LIMIT = 7
 
     def __init__(self, parent=None) -> None:
-        """Initialize set launcher with contextual left column."""
-
         super().__init__(parent=parent)
-        self.setWindowTitle("Context Pad")
+        self.setWindowTitle("Context Pad - Sets")
         self.set_button_columns(2)
 
-        related_widget = RelatedSetsList()
-        related_widget.related_selected.connect(self._on_related_clicked)
-        self.set_left_widget(related_widget)
+        self._sets = SetRegistry()
+        self._related_widget = RelatedSetsList()
+        self._related_widget.related_selected.connect(self._select_set_from_related)
+        self.set_left_widget(self._related_widget)
 
-        related_widget.set_related_sets(
-            [
-                {"id": "tail", "name": "Tail Set"},
-                {"id": "all", "name": "All Ctrls"},
-                {"id": "body", "name": "Body Main"},
-            ]
-        )
+        self._last_selection: List[str] = []
+        self._watch_timer = QtCore.QTimer(self)
+        self._watch_timer.setInterval(300)
+        self._watch_timer.timeout.connect(self._refresh_related_if_selection_changed)
 
-        self.set_buttons(
-            [
-                {"id": "set_1", "name": "Tail FK", "category_id": "tail", "color": "#8D7B69"},
-                {"id": "set_2", "name": "Tail IK", "category_id": "tail", "color": "#9A8774"},
-                {"id": "set_3", "name": "All Ctrls", "category_id": "all", "color": "#6E7F92"},
-                {"id": "set_4", "name": "Body Main", "category_id": "body", "color": "#6B8F9B"},
-                {"id": "set_5", "name": "Face Ctrls", "category_id": "all", "color": "#8B7DA8"},
-                {"id": "set_6", "name": "Props", "category_id": "all", "color": "#788977"},
-            ]
-        )
+        self._command_grid.button_clicked.connect(self._on_set_clicked)
+        self._command_grid.button_context_requested.connect(self._open_set_context_menu)
 
+        self.refresh_from_scene()
 
-    def _on_related_clicked(self, related_id: str) -> None:
-        """Handle related-set click as a quick action and collapse launcher."""
+    def refresh_from_scene(self) -> None:
+        """Refresh all and related sets from scene data."""
 
-        _ = related_id
-        self.close()
+        state = self._sets.refresh_scene_set_ui_state()
+        all_sets = self._build_all_sets(state)
+        related = self._build_related_sets(state)
+
+        self.set_buttons(all_sets)
+        self._related_widget.set_related_sets(related)
+        self._last_selection = self._sets.get_current_selection()
+
+    def on_add_requested(self) -> None:
+        """Create a set quickly from current selection."""
+
+        current = self._sets.get_current_selection()
+        if not current:
+            self._toast("Select objects first to create a set")
+            return
+
+        default_name = self._suggest_set_name()
+        name, ok = QtWidgets.QInputDialog.getText(self, "Create Set", "Set name", text=default_name)
+        if not ok or not name.strip():
+            return
+
+        if self._sets.create_set_from_selection(name.strip()):
+            self._sets.refresh_scene_set_ui_state()
+            self.refresh_from_scene()
+            self._toast(f"Created set: {name.strip()}")
+        else:
+            self._toast("Could not create set")
+
+    def on_manager_requested(self) -> None:
+        """Open manager window as secondary utility."""
+
+        try:
+            from context_pad.bootstrap import launch_context_pad
+
+            launch_context_pad()
+        except Exception:
+            self._toast("Unable to open manager")
+
+    def set_pinned(self, state: bool) -> None:
+        """Toggle pin state and selection watch behavior."""
+
+        super().set_pinned(state)
+        if state and self.isVisible():
+            self._start_selection_watch()
+        else:
+            self._stop_selection_watch()
+
+    def show_at_cursor(self) -> None:
+        """Show launcher and refresh scene data each time."""
+
+        self.refresh_from_scene()
+        super().show_at_cursor()
+        if self._is_pinned:
+            self._start_selection_watch()
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        """Ensure selection watch is fully stopped when closing."""
+
+        self._stop_selection_watch()
+        super().closeEvent(event)
+
+    def _build_all_sets(self, state: Dict[str, dict]) -> List[Dict[str, str]]:
+        """Build full set list respecting hidden/order/group metadata."""
+
+        records: List[Dict[str, str]] = []
+        for set_name in self._sets.list_scene_sets():
+            meta = state.get(set_name, {})
+            if bool(meta.get("hidden_state", False)):
+                continue
+            group = str(meta.get("group", "Main"))
+            records.append(
+                {
+                    "id": set_name,
+                    "name": set_name,
+                    "category_id": group,
+                    "color": str(meta.get("button_color", "#6B7280")),
+                    "display_order": int(meta.get("display_order", 1000)),
+                }
+            )
+
+        records.sort(key=lambda item: (str(item.get("category_id", "Main")).lower(), int(item.get("display_order", 1000)), str(item.get("name", "")).lower()))
+        return records
+
+    def _build_related_sets(self, state: Dict[str, dict]) -> List[Dict[str, str]]:
+        """Build contextual related sets (top N) for current selection."""
+
+        related_names = self._sets.get_related_sets_for_selection(require_all=True)
+        if not related_names:
+            return []
+
+        related_records: List[Dict[str, str]] = []
+        for name in related_names[: self._RELATED_LIMIT]:
+            meta = state.get(name, {})
+            if bool(meta.get("hidden_state", False)):
+                continue
+            related_records.append(
+                {
+                    "id": name,
+                    "name": name,
+                    "color": str(meta.get("button_color", "#6B7280")),
+                }
+            )
+        return related_records
+
+    def _on_set_clicked(self, payload: Dict[str, str]) -> None:
+        """LMB selects the set."""
+
+        set_name = str(payload.get("id", ""))
+        if not set_name:
+            return
+
+        if self._sets.select_set(set_name):
+            if not self._is_pinned:
+                self.close()
+        else:
+            self._toast(f"Could not select set: {set_name}")
+
+    def _select_set_from_related(self, set_name: str) -> None:
+        """Related quick shortcut uses the same select behavior."""
+
+        self._on_set_clicked({"id": set_name})
+
+    def _open_set_context_menu(self, payload: Dict[str, str], global_pos: object) -> None:
+        """Open RMB context menu for set maintenance operations."""
+
+        set_name = str(payload.get("id", ""))
+        if not set_name:
+            return
+
+        menu = QtWidgets.QMenu(self)
+        action_rename = menu.addAction("Rename")
+        action_delete = menu.addAction("Delete")
+        action_color = menu.addAction("Change Color")
+        action_update = menu.addAction("Update from Selection")
+
+        selected = menu.exec_(global_pos)
+        if selected is action_rename:
+            self._rename_set(set_name)
+        elif selected is action_delete:
+            self._delete_set(set_name)
+        elif selected is action_color:
+            self._change_set_color(set_name)
+        elif selected is action_update:
+            self._update_from_selection(set_name)
+
+    def _rename_set(self, old_name: str) -> None:
+        new_name, ok = QtWidgets.QInputDialog.getText(self, "Rename Set", "New set name", text=old_name)
+        if not ok or not new_name.strip() or new_name.strip() == old_name:
+            return
+        if self._sets.rename_set(old_name, new_name.strip()):
+            state = self._sets.refresh_scene_set_ui_state()
+            if old_name in state:
+                state[new_name.strip()] = state.pop(old_name)
+                self._sets.save_scene_set_ui_state(state)
+            self.refresh_from_scene()
+            self._toast(f"Renamed: {new_name.strip()}")
+        else:
+            self._toast("Could not rename set")
+
+    def _delete_set(self, set_name: str) -> None:
+        confirm = QtWidgets.QMessageBox.question(self, "Delete Set", f"Delete set '{set_name}'?")
+        if confirm != QtWidgets.QMessageBox.Yes:
+            return
+
+        if self._sets.delete_set(set_name):
+            self._sets.cleanup_missing_set_metadata()
+            self.refresh_from_scene()
+            self._toast(f"Deleted: {set_name}")
+        else:
+            self._toast("Could not delete set")
+
+    def _change_set_color(self, set_name: str) -> None:
+        color = QtWidgets.QColorDialog.getColor(parent=self, title=f"Set Color - {set_name}")
+        if not color.isValid():
+            return
+
+        state = self._sets.refresh_scene_set_ui_state()
+        state.setdefault(set_name, {})
+        state[set_name]["button_color"] = color.name()
+        self._sets.save_scene_set_ui_state(state)
+        self.refresh_from_scene()
+        self._toast(f"Color updated: {set_name}")
+
+    def _update_from_selection(self, set_name: str) -> None:
+        if self._sets.update_set_from_selection(set_name):
+            self.refresh_from_scene()
+            self._toast(f"Updated from selection: {set_name}")
+        else:
+            self._toast("Select objects first to update set")
+
+    def _refresh_related_if_selection_changed(self) -> None:
+        """Refresh related sets while pinned and visible only."""
+
+        current = self._sets.get_current_selection()
+        if current == self._last_selection:
+            return
+        self._last_selection = current
+        state = self._sets.refresh_scene_set_ui_state()
+        self._related_widget.set_related_sets(self._build_related_sets(state))
+
+    def _start_selection_watch(self) -> None:
+        if not self._watch_timer.isActive():
+            self._watch_timer.start()
+
+    def _stop_selection_watch(self) -> None:
+        if self._watch_timer.isActive():
+            self._watch_timer.stop()
+
+    def _suggest_set_name(self) -> str:
+        """Suggest a practical new set name."""
+
+        existing = set(self._sets.list_scene_sets())
+        base = "QuickSet"
+        index = 1
+        while True:
+            candidate = f"{base}_{index:02d}"
+            if candidate not in existing:
+                return candidate
+            index += 1
+
+    def _toast(self, message: str) -> None:
+        """Show lightweight user feedback near cursor."""
+
+        QtWidgets.QToolTip.showText(self.mapToGlobal(self.rect().center()), message, self)

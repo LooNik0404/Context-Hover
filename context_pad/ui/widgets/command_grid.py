@@ -8,9 +8,10 @@ from context_pad.maya_integration.qt_helpers import QtCore, QtGui, QtWidgets
 
 
 class CommandGrid(QtWidgets.QWidget):
-    """Grid widget rendering color-coded placeholder buttons."""
+    """Grid widget rendering color-coded buttons."""
 
     button_clicked = QtCore.Signal(dict)
+    button_context_requested = QtCore.Signal(dict, object)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None, columns: int = 2) -> None:
         """Initialize the command grid."""
@@ -34,7 +35,7 @@ class CommandGrid(QtWidgets.QWidget):
         self._rebuild_grid(self._buttons)
 
     def set_buttons(self, buttons: List[Dict[str, str]]) -> None:
-        """Populate grid from button records with id/name/color/category_id keys."""
+        """Populate grid from button records."""
 
         self._buttons = buttons
         self._rebuild_grid(buttons)
@@ -63,7 +64,12 @@ class CommandGrid(QtWidgets.QWidget):
             button.setStyleSheet(
                 f"background-color: {background.name()}; color: {foreground.name()};"
             )
+
             button.clicked.connect(lambda _=False, data=item_data: self.button_clicked.emit(data))
+            button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+            button.customContextMenuRequested.connect(
+                lambda pos, data=item_data, b=button: self.button_context_requested.emit(data, b.mapToGlobal(pos))
+            )
 
             row = index // self._columns
             col = index % self._columns

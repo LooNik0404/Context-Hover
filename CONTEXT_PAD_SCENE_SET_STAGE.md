@@ -1,141 +1,93 @@
-# Context Pad Scene Set + Scene Metadata Stage
+# Context Pad Set Launcher — Final Hover Workflow
 
-## Public API
-
-```python
-from context_pad.core.set_registry import SetRegistry
-
-sets = SetRegistry()
-
-# Scene set operations
-sets.list_scene_sets()
-sets.select_set("TailSet")
-sets.replace_with_set("TailSet")
-sets.add_set_to_selection("TailSet")
-sets.remove_set_from_selection("TailSet")
-sets.create_set_from_selection("TailSet")
-sets.update_set_from_selection("TailSet")
-sets.rename_set("TailSet", "TailSet_New")
-sets.delete_set("TailSet_New")
-sets.get_sets_for_object("tail_ctrl_01")
-sets.get_set_size("TailSet")
-sets.get_related_sets_for_selection(require_all=True)
-
-# Scene-local UI metadata operations
-sets.ensure_scene_meta_node()
-sets.load_scene_set_ui_state()
-sets.save_scene_set_ui_state({})
-sets.cleanup_missing_set_metadata()
-sets.refresh_scene_set_ui_state()
-```
-
-## Scene-local metadata sample structure
+## Open Set Launcher (Maya Script Editor, Python tab)
 
 ```python
-{
-    "TailSet": {
-        "display_order": 10,
-        "button_color": "#5D82A8",
-        "group": "Tail",
-        "hidden_state": False,
-    },
-    "AllCtrls_Set": {
-        "display_order": 999,
-        "button_color": "#6B7280",
-        "group": "Global",
-        "hidden_state": False,
-    },
-}
+from context_pad.bootstrap import show_set_launcher
+show_set_launcher()
 ```
 
-Stored on a dedicated Maya `network` node (`ContextPadSceneMeta`) as JSON string attr `cp_set_ui_state`.
+## Final Set Launcher workflow
 
-## Temporary harness
+The Set Launcher is now the primary place for fast set work:
 
-```python
-from context_pad.core.set_registry_harness import run_set_registry_demo
-print(run_set_registry_demo("ContextPad_TestSet"))
-```
+- **Top utility row (compact icons)**
+  - Pin / Unpin
+  - `+` create set from current selection
+  - manager utility icon (secondary)
+- **Left rail: Related Sets** (contextual shortcuts)
+- **Right side: All Sets** (full, stable list)
 
-## Copy-paste Maya snippets
+### Related Sets behavior
 
-### Create metadata node
-```python
-from context_pad.core.set_registry import SetRegistry
-print(SetRegistry().ensure_scene_meta_node())
-```
+- Empty selection: related rail stays hidden/minimized.
+- Single selection: shows sets containing that object.
+- Multi-selection: shows sets containing **all** selected objects.
+- Sorting:
+  1. smaller sets first (more specific)
+  2. then `display_order`
+  3. then name
+- Related list is limited to top 7 for speed and readability.
 
-### Change display order
-```python
-from context_pad.core.set_registry import SetRegistry
-reg = SetRegistry()
-state = reg.load_scene_set_ui_state()
-state.setdefault("TailSet", {})["display_order"] = 10
-reg.save_scene_set_ui_state(state)
-```
+### All Sets behavior
 
-### Change color
-```python
-from context_pad.core.set_registry import SetRegistry
-reg = SetRegistry()
-state = reg.load_scene_set_ui_state()
-state.setdefault("TailSet", {})["button_color"] = "#4A90E2"
-reg.save_scene_set_ui_state(state)
-```
+- Always shows full list (except hidden sets).
+- Uses scene metadata for:
+  - color (`button_color`)
+  - hidden state (`hidden_state`)
+  - order (`display_order`)
+  - grouping (`group`) for stable sorting
+- List is scrollable while utility row stays fixed.
 
-### Change group
-```python
-from context_pad.core.set_registry import SetRegistry
-reg = SetRegistry()
-state = reg.load_scene_set_ui_state()
-state.setdefault("TailSet", {})["group"] = "Tail"
-reg.save_scene_set_ui_state(state)
-```
+### Set button interactions
 
-### Hide/unhide set
-```python
-from context_pad.core.set_registry import SetRegistry
-reg = SetRegistry()
-state = reg.load_scene_set_ui_state()
-state.setdefault("TailSet", {})["hidden_state"] = True   # False to unhide
-reg.save_scene_set_ui_state(state)
-```
+- **LMB**: select that set
+- **RMB context menu**:
+  - Rename
+  - Delete
+  - Change Color
+  - Update from Selection
 
-### Related sets query for current selection
-```python
-from context_pad.core.set_registry import SetRegistry
-print(SetRegistry().get_related_sets_for_selection())
-```
+### Fast create behavior
 
-## Manual validation scenario (step-by-step)
+- `+` creates a set from current selection.
+- Empty selection shows readable feedback.
+- Uses a quick naming flow with suggested names.
 
-1. Select objects in Maya.
-2. Create `TailSet`: `create_set_from_selection("TailSet")`.
-3. Select all controls and create `AllCtrls_Set`.
-4. Edit metadata for both sets (`display_order`, `button_color`, `group`, `hidden_state`).
-5. Save scene.
-6. Reopen scene.
-7. Run `load_scene_set_ui_state()` and confirm order/color/group/hidden state values are preserved.
-8. Delete one set (for example `TailSet`).
-9. Run `refresh_scene_set_ui_state()`.
-10. Confirm stale metadata for deleted set is cleaned.
-11. Select one tail control and run `get_related_sets_for_selection()`.
-12. Confirm returned sets are ordered for future launcher usage by:
-    - smaller set size first,
-    - then metadata `display_order`,
-    - then set name.
+### Pinned refresh behavior
+
+- Related set auto-refresh runs only when launcher is:
+  - visible, and
+  - pinned.
+- Closing launcher stops this logic fully.
+- No permanent background watcher is created.
+
+## Why set management now lives in hover
+
+Set work is a rapid scene interaction task. Keeping create/rename/update/delete directly in the hover avoids context switching to manager forms and matches animator workflow speed.
+
+## Manual validation checklist
+
+- Open set launcher with nothing selected → only All Sets is visible or Related Sets is minimized.
+- Select one object from TailSet → Related Sets appears.
+- TailSet appears above AllCtrls_Set.
+- Select multiple objects → only sets containing all objects remain.
+- Click plus icon with selection → a new set is created.
+- Click plus icon with empty selection → readable warning.
+- RMB on a set button → context menu appears.
+- Rename works.
+- Delete works.
+- Change Color works.
+- Update from Selection works.
+- Pin launcher → change selection → Related Sets updates while pinned.
+- Close launcher → no background update logic remains active.
 
 ## Expected result
 
-- Scene set operations work through a UI-independent API.
-- Scene-local UI metadata is saved in Maya scene and survives save/reopen.
-- Missing metadata falls back to defaults automatically.
-- Deleted sets do not leave stale metadata forever after refresh.
-- Related set results are ready for future UI sorting behavior.
+A compact translucent hover launcher supports complete day-to-day set operations directly in scene context, with fast contextual related-set shortcuts and stable all-set access.
 
 ## Known limitations of this stage
 
-- No full set launcher UI hookup yet.
-- No drag-and-drop ordering UI yet.
-- Metadata schema migration/versioning is basic.
-- Related sorting currently uses size + display_order + name only.
+- Related updates use lightweight timer polling while pinned (not Maya callback events).
+- Grouping is reflected through sort order, not dedicated visual group headers.
+- Outside Maya, set actions safely no-op.
