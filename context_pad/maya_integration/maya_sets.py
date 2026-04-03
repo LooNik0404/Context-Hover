@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import List, Optional
 
 try:
@@ -80,16 +81,20 @@ def create_set_from_selection(name: str) -> bool:
         _log_warning("Maya cmds unavailable; cannot create set")
         return False
 
+    sanitized_name = sanitize_set_name(name)
+    if sanitized_name != name:
+        _log_info(f"Adjusted set name '{name}' -> '{sanitized_name}'")
+
     selection = _current_scene_selection()
     if not selection:
         _log_warning("Cannot create set: selection is empty")
         return False
-    if cmds.objExists(name):
-        _log_warning(f"Cannot create set: '{name}' already exists")
+    if cmds.objExists(sanitized_name):
+        _log_warning(f"Cannot create set: '{sanitized_name}' already exists")
         return False
 
-    cmds.sets(selection, name=name)
-    _log_info(f"Created set '{name}' with {len(selection)} members")
+    cmds.sets(selection, name=sanitized_name)
+    _log_info(f"Created set '{sanitized_name}' with {len(selection)} members")
     return True
 
 
@@ -120,15 +125,22 @@ def rename_set(old_name: str, new_name: str) -> bool:
     if cmds is None:
         _log_warning("Maya cmds unavailable; cannot rename set")
         return False
+    sanitized_name = sanitize_set_name(new_name)
+    if sanitized_name != new_name:
+        _log_info(f"Adjusted set name '{new_name}' -> '{sanitized_name}'")
+
     if not cmds.objExists(old_name):
         _log_warning(f"Cannot rename set: '{old_name}' does not exist")
         return False
-    if cmds.objExists(new_name):
-        _log_warning(f"Cannot rename set: '{new_name}' already exists")
+    if old_name == sanitized_name:
+        _log_info(f"Rename skipped: '{old_name}' already matches normalized name")
+        return True
+    if cmds.objExists(sanitized_name):
+        _log_warning(f"Cannot rename set: '{sanitized_name}' already exists")
         return False
 
-    cmds.rename(old_name, new_name)
-    _log_info(f"Renamed set '{old_name}' to '{new_name}'")
+    cmds.rename(old_name, sanitized_name)
+    _log_info(f"Renamed set '{old_name}' to '{sanitized_name}'")
     return True
 
 
@@ -236,6 +248,20 @@ def _short_name(node_name: str) -> str:
     """Return short node name without DAG path segments."""
 
     return str(node_name).split("|")[-1]
+
+
+def sanitize_set_name(name: str, prefix: str = "set_") -> str:
+    """Normalize user-entered set names into Maya-safe readable identifiers."""
+
+    raw = str(name or "").strip()
+    cleaned = re.sub(r"\s+", "_", raw)
+    cleaned = re.sub(r"[^A-Za-z0-9_]", "_", cleaned)
+    cleaned = re.sub(r"_+", "_", cleaned).strip("_")
+    if not cleaned:
+        cleaned = "set"
+    if cleaned[0].isdigit():
+        cleaned = f"{prefix}{cleaned}"
+    return cleaned
 
 def _set_members(name: str) -> Optional[List[str]]:
     """Return set members or None when set is unavailable."""

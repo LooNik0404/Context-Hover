@@ -104,3 +104,7 @@ class SetRegistry:
 
         return maya_scene_meta.refresh_scene_set_ui_state()
 
+    def sanitize_set_name(self, name: str) -> str:
+        """Normalize user-entered set name to Maya-safe identifier."""
+
+        return maya_sets.sanitize_set_name(name)

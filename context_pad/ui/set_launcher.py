@@ -75,7 +75,11 @@ class SetLauncher(LauncherBase):
         if not ok or not name.strip():
             return
 
-        new_name = name.strip()
+        raw_name = name.strip()
+        new_name = self._sets.sanitize_set_name(raw_name)
+        if new_name != raw_name:
+            self._toast(f"Adjusted set name: {raw_name} → {new_name}")
+            self._log_warning(f"Adjusted set name '{raw_name}' to '{new_name}' for Maya compatibility")
         if self._sets.create_set_from_selection(new_name):
             state = self._sets.refresh_scene_set_ui_state()
             state.setdefault(new_name, {})
@@ -232,7 +236,14 @@ class SetLauncher(LauncherBase):
         if not ok or not new_name.strip() or new_name.strip() == old_name:
             return
 
-        clean_name = new_name.strip()
+        raw_name = new_name.strip()
+        clean_name = self._sets.sanitize_set_name(raw_name)
+        if clean_name != raw_name:
+            self._toast(f"Adjusted set name: {raw_name} → {clean_name}")
+            self._log_warning(f"Adjusted set rename '{raw_name}' to '{clean_name}' for Maya compatibility")
+        if clean_name == old_name:
+            self._toast("Set name unchanged")
+            return
         state_before = self._sets.load_scene_set_ui_state()
         cached_meta = dict(state_before.get(old_name, {}))
 

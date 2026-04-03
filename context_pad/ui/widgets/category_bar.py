@@ -10,6 +10,9 @@ from context_pad.maya_integration.qt_helpers import QtCore, QtGui, QtWidgets
 class CategoryBar(QtWidgets.QWidget):
     """Compact list widget for displaying selectable categories."""
 
+    _WHEEL_STEP_DELTA = 120
+    _WHEEL_COOLDOWN_MS = 60
+
     category_changed = QtCore.Signal(str)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
@@ -17,6 +20,10 @@ class CategoryBar(QtWidgets.QWidget):
 
         super().__init__(parent)
         self._categories: List[Dict[str, str]] = []
+        self._wheel_accumulator = 0
+        self._wheel_timer = QtCore.QElapsedTimer()
+        self._wheel_timer.start()
+        self._last_wheel_switch_ms = -10_000
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -99,13 +106,27 @@ class CategoryBar(QtWidgets.QWidget):
             if delta == 0:
                 return True
 
-            current_row = self._list.currentRow()
-            if current_row < 0:
-                current_row = 0
-            step = -1 if delta > 0 else 1
-            next_row = max(0, min(self._list.count() - 1, current_row + step))
-            if next_row != current_row:
+            self._wheel_accumulator += int(delta)
+            now_ms = self._wheel_timer.elapsed()
+            if (now_ms - self._last_wheel_switch_ms) < self._WHEEL_COOLDOWN_MS:
+                return True
+
+            while abs(self._wheel_accumulator) >= self._WHEEL_STEP_DELTA:
+                current_row = self._list.currentRow()
+                if current_row < 0:
+                    current_row = 0
+
+                is_up_scroll = self._wheel_accumulator > 0
+                move = -1 if is_up_scroll else 1
+                next_row = max(0, min(self._list.count() - 1, current_row + move))
+                if next_row == current_row:
+                    self._wheel_accumulator = 0
+                    break
+
                 self._list.setCurrentRow(next_row)
+                self._wheel_accumulator -= self._WHEEL_STEP_DELTA if is_up_scroll else -self._WHEEL_STEP_DELTA
+                self._last_wheel_switch_ms = now_ms
+                break
             return True
 
         return super().eventFilter(watched, event)
