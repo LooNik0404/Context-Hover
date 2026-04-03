@@ -15,6 +15,7 @@ The Set Launcher is now the primary place for fast set work:
   - Pin / Unpin
   - `+` create set from current selection
   - manager utility icon (secondary)
+  - pinned hover can be dragged by top bar
 - **Left rail: Related Sets** (contextual shortcuts)
 - **Right side: All Sets** (full, stable list)
 
@@ -42,10 +43,10 @@ The Set Launcher is now the primary place for fast set work:
 ### Set button interactions
 
 - **LMB**: select that set
-- **RMB context menu**:
+- **RMB context menu** (launcher stays open while using menu):
   - Rename
   - Delete
-  - Change Color
+  - Change Color (limited palette)
   - Update from Selection
 
 ### Fast create behavior
@@ -53,6 +54,7 @@ The Set Launcher is now the primary place for fast set work:
 - `+` creates a set from current selection.
 - Empty selection shows readable feedback.
 - Uses a quick naming flow with suggested names.
+- New sets get a random color from a fixed approved color palette.
 
 ### Pinned refresh behavior
 
@@ -89,5 +91,6 @@ A compact translucent hover launcher supports complete day-to-day set operations
 ## Known limitations of this stage
 
 - Related updates use lightweight timer polling while pinned (not Maya callback events).
+- Color choice uses a fixed quick-pick palette (no free color wheel in this stage).
 - Grouping is reflected through sort order, not dedicated visual group headers.
 - Outside Maya, set actions safely no-op.

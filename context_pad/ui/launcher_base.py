@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from context_pad.maya_integration.qt_helpers import QtCore, QtGui, QtWidgets
 from context_pad.ui.styles import launcher_stylesheet
@@ -19,12 +19,11 @@ class LauncherBase(QtWidgets.QWidget):
 
         super().__init__(parent)
         self._is_pinned = False
+        self._drag_offset: Optional[QtCore.QPoint] = None
 
-        self.setWindowFlags(
-            QtCore.Qt.Tool
-            | QtCore.Qt.FramelessWindowHint
-            | QtCore.Qt.WindowStaysOnTopHint
-        )
+        # Tool window keeps launcher above Maya while parented to Maya main window,
+        # without forcing always-on-top against other applications.
+        self.setWindowFlags(QtCore.Qt.Tool | QtCore.Qt.FramelessWindowHint)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
@@ -47,6 +46,7 @@ class LauncherBase(QtWidgets.QWidget):
         self._utility_bar.pin_toggled.connect(self.set_pinned)
         self._utility_bar.add_clicked.connect(self.on_add_requested)
         self._utility_bar.manager_clicked.connect(self.on_manager_requested)
+        self._utility_bar.installEventFilter(self)
         top_bar.addWidget(self._utility_bar, 1)
         body_layout.addLayout(top_bar)
 
@@ -143,3 +143,23 @@ class LauncherBase(QtWidgets.QWidget):
         super().focusOutEvent(event)
         if not self._is_pinned:
             self.close()
+
+    def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        """Allow dragging launcher via top utility bar when pinned."""
+
+        if watched is self._utility_bar and self._is_pinned:
+            if event.type() == QtCore.QEvent.MouseButtonPress:
+                mouse_event = event
+                if mouse_event.button() == QtCore.Qt.LeftButton:
+                    self._drag_offset = mouse_event.globalPos() - self.frameGeometry().topLeft()
+                    return True
+            elif event.type() == QtCore.QEvent.MouseMove and self._drag_offset is not None:
+                mouse_event = event
+                if mouse_event.buttons() & QtCore.Qt.LeftButton:
+                    self.move(mouse_event.globalPos() - self._drag_offset)
+                    return True
+            elif event.type() == QtCore.QEvent.MouseButtonRelease:
+                self._drag_offset = None
+                return True
+
+        return super().eventFilter(watched, event)

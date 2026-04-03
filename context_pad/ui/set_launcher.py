@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 from typing import Dict, List
 
 from context_pad.core.set_registry import SetRegistry
@@ -15,6 +16,16 @@ class SetLauncher(LauncherBase):
     """Overlay launcher for fast scene-set operations."""
 
     _RELATED_LIMIT = 7
+    _SET_COLORS = [
+        "#5D82A8",
+        "#6E8F66",
+        "#7A70A3",
+        "#4A90E2",
+        "#7EA178",
+        "#887CB0",
+        "#D9822B",
+        "#6B7280",
+    ]
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent=parent)
@@ -30,6 +41,7 @@ class SetLauncher(LauncherBase):
         self._watch_timer = QtCore.QTimer(self)
         self._watch_timer.setInterval(300)
         self._watch_timer.timeout.connect(self._refresh_related_if_selection_changed)
+        self._context_menu_active = False
 
         self._command_grid.button_clicked.connect(self._on_set_clicked)
         self._command_grid.button_context_requested.connect(self._open_set_context_menu)
@@ -56,14 +68,20 @@ class SetLauncher(LauncherBase):
             return
 
         default_name = self._suggest_set_name()
+        self._context_menu_active = True
         name, ok = QtWidgets.QInputDialog.getText(self, "Create Set", "Set name", text=default_name)
+        self._context_menu_active = False
         if not ok or not name.strip():
             return
 
-        if self._sets.create_set_from_selection(name.strip()):
-            self._sets.refresh_scene_set_ui_state()
+        new_name = name.strip()
+        if self._sets.create_set_from_selection(new_name):
+            state = self._sets.refresh_scene_set_ui_state()
+            state.setdefault(new_name, {})
+            state[new_name]["button_color"] = random.choice(self._SET_COLORS)
+            self._sets.save_scene_set_ui_state(state)
             self.refresh_from_scene()
-            self._toast(f"Created set: {name.strip()}")
+            self._toast(f"Created set: {new_name}")
         else:
             self._toast("Could not create set")
 
@@ -100,6 +118,14 @@ class SetLauncher(LauncherBase):
         self._stop_selection_watch()
         super().closeEvent(event)
 
+    def focusOutEvent(self, event) -> None:  # noqa: N802
+        """Keep launcher open while RMB menu/dialog interactions are active."""
+
+        if self._context_menu_active:
+            event.accept()
+            return
+        super().focusOutEvent(event)
+
     def _build_all_sets(self, state: Dict[str, dict]) -> List[Dict[str, str]]:
         """Build full set list respecting hidden/order/group metadata."""
 
@@ -119,7 +145,13 @@ class SetLauncher(LauncherBase):
                 }
             )
 
-        records.sort(key=lambda item: (str(item.get("category_id", "Main")).lower(), int(item.get("display_order", 1000)), str(item.get("name", "")).lower()))
+        records.sort(
+            key=lambda item: (
+                str(item.get("category_id", "Main")).lower(),
+                int(item.get("display_order", 1000)),
+                str(item.get("name", "")).lower(),
+            )
+        )
         return records
 
     def _build_related_sets(self, state: Dict[str, dict]) -> List[Dict[str, str]]:
@@ -168,6 +200,7 @@ class SetLauncher(LauncherBase):
         if not set_name:
             return
 
+        self._context_menu_active = True
         menu = QtWidgets.QMenu(self)
         action_rename = menu.addAction("Rename")
         action_delete = menu.addAction("Delete")
@@ -184,8 +217,12 @@ class SetLauncher(LauncherBase):
         elif selected is action_update:
             self._update_from_selection(set_name)
 
+        self._context_menu_active = False
+
     def _rename_set(self, old_name: str) -> None:
+        self._context_menu_active = True
         new_name, ok = QtWidgets.QInputDialog.getText(self, "Rename Set", "New set name", text=old_name)
+        self._context_menu_active = False
         if not ok or not new_name.strip() or new_name.strip() == old_name:
             return
         if self._sets.rename_set(old_name, new_name.strip()):
@@ -199,7 +236,9 @@ class SetLauncher(LauncherBase):
             self._toast("Could not rename set")
 
     def _delete_set(self, set_name: str) -> None:
+        self._context_menu_active = True
         confirm = QtWidgets.QMessageBox.question(self, "Delete Set", f"Delete set '{set_name}'?")
+        self._context_menu_active = False
         if confirm != QtWidgets.QMessageBox.Yes:
             return
 
@@ -211,13 +250,22 @@ class SetLauncher(LauncherBase):
             self._toast("Could not delete set")
 
     def _change_set_color(self, set_name: str) -> None:
-        color = QtWidgets.QColorDialog.getColor(parent=self, title=f"Set Color - {set_name}")
-        if not color.isValid():
+        self._context_menu_active = True
+        color, ok = QtWidgets.QInputDialog.getItem(
+            self,
+            "Set Color",
+            "Choose color",
+            self._SET_COLORS,
+            0,
+            False,
+        )
+        self._context_menu_active = False
+        if not ok or not color:
             return
 
         state = self._sets.refresh_scene_set_ui_state()
         state.setdefault(set_name, {})
-        state[set_name]["button_color"] = color.name()
+        state[set_name]["button_color"] = color
         self._sets.save_scene_set_ui_state(state)
         self.refresh_from_scene()
         self._toast(f"Color updated: {set_name}")

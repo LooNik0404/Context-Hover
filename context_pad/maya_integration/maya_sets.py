@@ -29,11 +29,9 @@ def list_scene_sets() -> List[str]:
 
 
 def get_current_selection() -> List[str]:
-    """Return current scene selection as full path names."""
+    """Return current scene selection filtered for practical set operations."""
 
-    if cmds is None:
-        return []
-    return cmds.ls(selection=True, long=True) or []
+    return _current_scene_selection()
 
 
 def select_set(name: str) -> bool:
@@ -82,7 +80,7 @@ def create_set_from_selection(name: str) -> bool:
         _log_warning("Maya cmds unavailable; cannot create set")
         return False
 
-    selection = cmds.ls(selection=True, long=True) or []
+    selection = _current_scene_selection()
     if not selection:
         _log_warning("Cannot create set: selection is empty")
         return False
@@ -105,7 +103,7 @@ def update_set_from_selection(name: str) -> bool:
         _log_warning(f"Cannot update set: '{name}' does not exist")
         return False
 
-    selection = cmds.ls(selection=True, long=True) or []
+    selection = _current_scene_selection()
     if not selection:
         _log_warning("Cannot update set: selection is empty")
         return False
@@ -179,20 +177,23 @@ def get_related_sets_for_selection(selection: Optional[List[str]] = None, requir
     if cmds is None:
         return []
 
-    chosen = selection if selection is not None else (cmds.ls(selection=True, long=True) or [])
+    chosen = selection if selection is not None else _current_scene_selection()
     if not chosen:
         _log_info("No selection provided for related sets query")
         return []
 
-    selected_set = set(chosen)
+    selected_long = set(chosen)
+    selected_short = {_short_name(item) for item in chosen}
     related: List[str] = []
     for set_name in list_scene_sets():
         members = cmds.sets(set_name, query=True) or []
-        members_set = set(members)
+        members_long = set(members)
+        members_short = {_short_name(item) for item in members}
+
         if require_all:
-            if selected_set.issubset(members_set):
+            if selected_long.issubset(members_long) or selected_short.issubset(members_short):
                 related.append(set_name)
-        elif selected_set.intersection(members_set):
+        elif selected_long.intersection(members_long) or selected_short.intersection(members_short):
             related.append(set_name)
 
     try:
@@ -211,6 +212,30 @@ def get_related_sets_for_selection(selection: Optional[List[str]] = None, requir
     )
     return related
 
+
+
+def _current_scene_selection() -> List[str]:
+    """Return selection excluding service/meta nodes and objectSet nodes."""
+
+    if cmds is None:
+        return []
+
+    selected = cmds.ls(selection=True, long=True) or []
+    filtered: List[str] = []
+    for node in selected:
+        short_name = _short_name(node)
+        if short_name == "ContextPadSceneMeta":
+            continue
+        if cmds.nodeType(node) == "objectSet":
+            continue
+        filtered.append(node)
+    return filtered
+
+
+def _short_name(node_name: str) -> str:
+    """Return short node name without DAG path segments."""
+
+    return str(node_name).split("|")[-1]
 
 def _set_members(name: str) -> Optional[List[str]]:
     """Return set members or None when set is unavailable."""
