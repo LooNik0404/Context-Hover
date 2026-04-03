@@ -44,6 +44,16 @@ class PinZone(QtWidgets.QFrame):
         self._pin_button.setChecked(state)
         self._pin_button.setText("●" if state else "○")
 
+    def set_add_visible(self, visible: bool) -> None:
+        """Show or hide plus utility button."""
+
+        self._add_button.setVisible(visible)
+
+    def set_manager_visible(self, visible: bool) -> None:
+        """Show or hide manager utility button."""
+
+        self._manager_button.setVisible(visible)
+
     def _on_pin_toggled(self, state: bool) -> None:
         """Emit pin changes using a minimal dot-state icon."""
 

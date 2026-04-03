@@ -79,6 +79,16 @@ class LauncherBase(QtWidgets.QWidget):
         self._command_scroll.setWidget(self._command_grid)
         content_layout.addWidget(self._command_scroll, 1)
 
+    def set_add_button_visible(self, visible: bool) -> None:
+        """Show or hide the add button in top utility zone."""
+
+        self._utility_bar.set_add_visible(visible)
+
+    def set_manager_button_visible(self, visible: bool) -> None:
+        """Show or hide the manager button in top utility zone."""
+
+        self._utility_bar.set_manager_visible(visible)
+
     def set_left_widget(self, widget: QtWidgets.QWidget) -> None:
         """Replace left column widget with a custom widget."""
 

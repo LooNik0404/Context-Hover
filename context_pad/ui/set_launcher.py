@@ -36,6 +36,7 @@ class SetLauncher(LauncherBase):
         self._related_widget = RelatedSetsList()
         self._related_widget.related_selected.connect(self._select_set_from_related)
         self.set_left_widget(self._related_widget)
+        self.set_manager_button_visible(False)
 
         self._last_selection: List[str] = []
         self._watch_timer = QtCore.QTimer(self)

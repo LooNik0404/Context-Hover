@@ -24,7 +24,7 @@ class ScriptLauncher(LauncherBase):
         category_widget.category_changed.connect(self._command_grid.filter_by_category)
         self.set_left_widget(category_widget)
 
-        self._command_grid.button_clicked.connect(run_button_action)
+        self._command_grid.button_clicked.connect(self._on_script_clicked)
         self.refresh_data()
 
     def refresh_data(self) -> None:
@@ -99,6 +99,12 @@ class ScriptLauncher(LauncherBase):
             ]
         )
 
+    def _on_script_clicked(self, payload: dict) -> None:
+        """Run script action and close launcher on successful unpinned click."""
+
+        success = run_button_action(payload)
+        if success and not self.is_pinned():
+            self.close()
 
     def on_add_requested(self) -> None:
         """Open manager and start quick script-button creation."""
