@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from context_pad.maya_integration import maya_sets
+from context_pad.maya_integration import maya_scene_meta, maya_sets
 
 
 class SetRegistry:
@@ -73,3 +73,29 @@ class SetRegistry:
         """Return related sets for single or multi-object selection."""
 
         return maya_sets.get_related_sets_for_selection(selection=selection, require_all=require_all)
+
+    def ensure_scene_meta_node(self) -> str:
+        """Ensure dedicated scene metadata node exists."""
+
+        return maya_scene_meta.ensure_scene_meta_node()
+
+    def load_scene_set_ui_state(self) -> dict:
+        """Load scene-local UI metadata for sets."""
+
+        return maya_scene_meta.load_scene_set_ui_state()
+
+    def save_scene_set_ui_state(self, data: dict) -> bool:
+        """Save scene-local UI metadata for sets."""
+
+        return maya_scene_meta.save_scene_set_ui_state(data)
+
+    def cleanup_missing_set_metadata(self) -> dict:
+        """Remove stale metadata entries for deleted sets."""
+
+        return maya_scene_meta.cleanup_missing_set_metadata()
+
+    def refresh_scene_set_ui_state(self) -> dict:
+        """Refresh metadata defaults and cleanup missing sets."""
+
+        return maya_scene_meta.refresh_scene_set_ui_state()
+

@@ -187,7 +187,20 @@ def get_related_sets_for_selection(selection: Optional[List[str]] = None, requir
         elif selected_set.intersection(members_set):
             related.append(set_name)
 
-    related.sort(key=lambda item: (get_set_size(item), item.lower()))
+    try:
+        from .maya_scene_meta import load_scene_set_ui_state
+
+        ui_state = load_scene_set_ui_state()
+    except Exception:
+        ui_state = {}
+
+    related.sort(
+        key=lambda item: (
+            get_set_size(item),
+            int(ui_state.get(item, {}).get("display_order", 1000)),
+            item.lower(),
+        )
+    )
     return related
 
 
