@@ -191,7 +191,7 @@ def get_set_size(name: str) -> int:
 
 
 def get_related_sets_for_selection(selection: Optional[List[str]] = None, require_all: bool = True) -> List[str]:
-    """Return sets related to current/explicit selection, sorted by specificity."""
+    """Return sets related to selection using strict matching with ranked fallback."""
 
     if cmds is None:
         return []
@@ -201,20 +201,6 @@ def get_related_sets_for_selection(selection: Optional[List[str]] = None, requir
         _log_info("No selection provided for related sets query")
         return []
 
-    selected_long = set(chosen)
-    selected_short = {_short_name(item) for item in chosen}
-    related: List[str] = []
-    for set_name in list_scene_sets():
-        members = cmds.sets(set_name, query=True) or []
-        members_long = set(members)
-        members_short = {_short_name(item) for item in members}
-
-        if require_all:
-            if selected_long.issubset(members_long) or selected_short.issubset(members_short):
-                related.append(set_name)
-        elif selected_long.intersection(members_long) or selected_short.intersection(members_short):
-            related.append(set_name)
-
     try:
         from .maya_scene_meta import load_scene_set_ui_state
 
@@ -222,14 +208,64 @@ def get_related_sets_for_selection(selection: Optional[List[str]] = None, requir
     except Exception:
         ui_state = {}
 
-    related.sort(
+    selected_long = set(chosen)
+    selected_short = {_short_name(item) for item in chosen}
+    selected_count = max(1, len(selected_short))
+
+    strict_related: List[str] = []
+    partial_related: List[tuple[str, int, float, int]] = []
+    for set_name in list_scene_sets():
+        members = cmds.sets(set_name, query=True) or []
+        members_long = set(members)
+        members_short = {_short_name(item) for item in members}
+
+        overlap_count = max(
+            len(selected_long.intersection(members_long)),
+            len(selected_short.intersection(members_short)),
+        )
+        if overlap_count <= 0:
+            continue
+
+        strict_match = selected_long.issubset(members_long) or selected_short.issubset(members_short)
+        if strict_match:
+            strict_related.append(set_name)
+            continue
+
+        overlap_ratio = float(overlap_count) / float(selected_count)
+        partial_related.append((set_name, overlap_count, overlap_ratio, len(members_short)))
+
+    if len(chosen) == 1:
+        related = strict_related + [item[0] for item in partial_related]
+        related = sorted(
+            set(related),
+            key=lambda item: (
+                get_set_size(item),
+                int(ui_state.get(item, {}).get("display_order", 1000)),
+                item.lower(),
+            ),
+        )
+        return related
+
+    if require_all and strict_related:
+        strict_related.sort(
+            key=lambda item: (
+                get_set_size(item),
+                int(ui_state.get(item, {}).get("display_order", 1000)),
+                item.lower(),
+            )
+        )
+        return strict_related
+
+    partial_related.sort(
         key=lambda item: (
-            get_set_size(item),
-            int(ui_state.get(item, {}).get("display_order", 1000)),
-            item.lower(),
+            -item[1],  # overlap count desc
+            -item[2],  # overlap ratio desc
+            item[3],  # set size asc (specific first)
+            int(ui_state.get(item[0], {}).get("display_order", 1000)),
+            item[0].lower(),
         )
     )
-    return related
+    return [item[0] for item in partial_related]
 
 
 
