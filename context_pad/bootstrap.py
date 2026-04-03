@@ -39,6 +39,7 @@ def show_script_launcher() -> ScriptLauncher:
     global _SCRIPT_LAUNCHER
     if _SCRIPT_LAUNCHER is None:
         _SCRIPT_LAUNCHER = ScriptLauncher(parent=maya_main_window())
+    _SCRIPT_LAUNCHER.refresh_data()
     _SCRIPT_LAUNCHER.show_at_cursor()
     return _SCRIPT_LAUNCHER
 

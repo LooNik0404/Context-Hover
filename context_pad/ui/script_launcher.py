@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+from context_pad.core.command_runner import run_button_action
+from context_pad.core.script_registry import ManifestValidationError, ScriptRegistry
+
 from .launcher_base import LauncherBase
 from .widgets.category_bar import CategoryBar
 
 
 class ScriptLauncher(LauncherBase):
-    """Overlay launcher displaying script placeholder items."""
+    """Overlay launcher displaying script buttons from manifest."""
 
     def __init__(self, parent=None) -> None:
-        """Initialize script launcher with compact category+grid layout."""
+        """Initialize script launcher with category+grid layout."""
 
         super().__init__(parent=parent)
         self.setWindowTitle("Context Pad")
@@ -21,6 +24,43 @@ class ScriptLauncher(LauncherBase):
         category_widget.category_changed.connect(self._command_grid.filter_by_category)
         self.set_left_widget(category_widget)
 
+        self._command_grid.button_clicked.connect(run_button_action)
+        self.refresh_data()
+
+    def refresh_data(self) -> None:
+        """Load categories/buttons from manifest and populate launcher."""
+
+        registry = ScriptRegistry()
+        try:
+            registry.load_manifest()
+            categories = [
+                {"id": item["id"], "name": item["label"], "color": item.get("color", "#6B7280")}
+                for item in registry.get_categories()
+            ]
+            buttons = []
+            for category in categories:
+                for item in registry.get_buttons_for_category(category["id"]):
+                    buttons.append(
+                        {
+                            "id": item["id"],
+                            "name": item["label"],
+                            "category_id": item["category_id"],
+                            "color": item["color"],
+                            "type": item["action_type"],
+                            "source": item["source"],
+                            "label": item["label"],
+                            "tooltip": item.get("tooltip", ""),
+                            "code": item["source"] if item["action_type"].endswith("inline") else "",
+                            "file_path": item["source"] if item["action_type"].endswith("file") else "",
+                        }
+                    )
+
+            self.set_categories(categories)
+            self.set_buttons(buttons)
+            return
+        except ManifestValidationError:
+            pass
+
         self.set_categories(
             [
                 {"id": "anim", "name": "Animation", "color": "#9DB4D1"},
@@ -30,11 +70,27 @@ class ScriptLauncher(LauncherBase):
         )
         self.set_buttons(
             [
-                {"id": "scr_1", "name": "Bake Keys", "category_id": "anim", "color": "#5D82A8"},
-                {"id": "scr_2", "name": "Mirror Pose", "category_id": "anim", "color": "#6E95BC"},
-                {"id": "scr_3", "name": "Select Ctrls", "category_id": "rig", "color": "#6B8F66"},
-                {"id": "scr_4", "name": "Zero Ctrls", "category_id": "rig", "color": "#7EA178"},
-                {"id": "scr_5", "name": "Toggle HUD", "category_id": "util", "color": "#746A96"},
-                {"id": "scr_6", "name": "Frame Sel", "category_id": "util", "color": "#887CB0"},
+                {
+                    "id": "scr_1",
+                    "name": "Bake Keys",
+                    "label": "Bake Keys",
+                    "category_id": "anim",
+                    "color": "#5D82A8",
+                    "type": "python_inline",
+                    "source": "print('Bake Keys placeholder')",
+                    "code": "print('Bake Keys placeholder')",
+                    "file_path": "",
+                },
+                {
+                    "id": "scr_2",
+                    "name": "Mirror Pose",
+                    "label": "Mirror Pose",
+                    "category_id": "anim",
+                    "color": "#6E95BC",
+                    "type": "python_inline",
+                    "source": "print('Mirror Pose placeholder')",
+                    "code": "print('Mirror Pose placeholder')",
+                    "file_path": "",
+                },
             ]
         )
