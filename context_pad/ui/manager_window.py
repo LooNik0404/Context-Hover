@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from context_pad.core.app_state import AppState
 from context_pad.core.script_library_editor import ScriptLibraryEditor
-from context_pad.maya_integration.qt_helpers import QtCore, QtWidgets
+from context_pad.maya_integration.qt_helpers import QtCore, QtGui, QtWidgets
 from context_pad.ui.widgets.color_picker import ColorPicker
 
 
@@ -220,6 +220,7 @@ class ManagerWindow(QtWidgets.QMainWindow):
         for item in self._buttons_for_current_category():
             row = QtWidgets.QListWidgetItem(item.get("label", "Unnamed"))
             row.setData(QtCore.Qt.UserRole, item.get("id", ""))
+            row.setIcon(self._make_color_icon(str(item.get("color", "#6B7280"))))
             self._button_list.addItem(row)
             if selected_button and item.get("id") == selected_button:
                 self._button_list.setCurrentItem(row)
@@ -314,6 +315,19 @@ class ManagerWindow(QtWidgets.QMainWindow):
     def _on_button_changed(self, *_: Any) -> None:
         self._active_button_id = self._current_button_id() or None
         self._sync_selection_views()
+
+    def _make_color_icon(self, color: str) -> QtGui.QIcon:
+        """Build a compact color dot icon for button-list overview."""
+
+        pixmap = QtGui.QPixmap(12, 12)
+        pixmap.fill(QtCore.Qt.transparent)
+        painter = QtGui.QPainter(pixmap)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        painter.setPen(QtGui.QPen(QtGui.QColor(255, 255, 255, 110), 1))
+        painter.setBrush(QtGui.QColor(color))
+        painter.drawEllipse(1, 1, 10, 10)
+        painter.end()
+        return QtGui.QIcon(pixmap)
 
     def _add_category(self) -> None:
         text, ok = QtWidgets.QInputDialog.getText(self, "Add Category", "Category name")
@@ -453,10 +467,19 @@ class ManagerWindow(QtWidgets.QMainWindow):
     def _save_library(self) -> None:
         try:
             self._editor.save()
+            from context_pad.bootstrap import refresh_script_launcher
+
+            refresh_script_launcher()
             self._status.setText("Library saved")
         except Exception as exc:
             self._status.setText(f"Save failed: {exc}")
 
     def _reload_library(self) -> None:
         self._refresh_all()
+        try:
+            from context_pad.bootstrap import refresh_script_launcher
+
+            refresh_script_launcher()
+        except Exception:
+            pass
         self._status.setText("Library reloaded")

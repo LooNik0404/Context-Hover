@@ -123,9 +123,11 @@ class LauncherBase(QtWidgets.QWidget):
     def set_buttons(self, data: List[Dict[str, str]]) -> None:
         """Set launcher buttons from data records."""
 
-        self._command_grid.set_buttons(data)
+        self._command_grid.set_buttons(data, rebuild=False)
         if isinstance(self._left_widget, CategoryBar):
             self._command_grid.filter_by_category(self._left_widget.current_category())
+        else:
+            self._command_grid.set_buttons(data)
 
     def set_pinned(self, state: bool) -> None:
         """Set pin state for launcher behavior."""

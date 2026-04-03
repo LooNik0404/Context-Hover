@@ -20,6 +20,7 @@ class CommandGrid(QtWidgets.QWidget):
         self.setAutoFillBackground(False)
         self.setStyleSheet("background: transparent;")
         self._buttons: List[Dict[str, str]] = []
+        self._visible_button_ids: List[str] = []
         self._columns = max(1, columns)
 
         self._layout = QtWidgets.QGridLayout(self)
@@ -34,17 +35,27 @@ class CommandGrid(QtWidgets.QWidget):
         self._columns = max(1, columns)
         self._rebuild_grid(self._buttons)
 
-    def set_buttons(self, buttons: List[Dict[str, str]]) -> None:
+    def set_buttons(self, buttons: List[Dict[str, str]], rebuild: bool = True) -> None:
         """Populate grid from button records."""
 
         self._buttons = buttons
-        self._rebuild_grid(buttons)
+        if rebuild:
+            self._set_visible_buttons(buttons)
 
     def filter_by_category(self, category_id: str) -> None:
         """Display buttons matching category id, or all when blank."""
 
         filtered = [b for b in self._buttons if not category_id or b.get("category_id") == category_id]
-        self._rebuild_grid(filtered)
+        self._set_visible_buttons(filtered)
+
+    def _set_visible_buttons(self, buttons: List[Dict[str, str]]) -> None:
+        """Rebuild only when visible ids actually changed."""
+
+        visible_ids = [str(item.get("id", "")) for item in buttons]
+        if visible_ids == self._visible_button_ids:
+            return
+        self._visible_button_ids = visible_ids
+        self._rebuild_grid(buttons)
 
     def _rebuild_grid(self, buttons: List[Dict[str, str]]) -> None:
         """Recreate the visible button grid."""

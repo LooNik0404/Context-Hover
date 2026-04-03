@@ -30,6 +30,9 @@ class ScriptLauncher(LauncherBase):
     def refresh_data(self) -> None:
         """Load categories/buttons from manifest and populate launcher."""
 
+        current_category_id = (
+            self._left_widget.current_category() if isinstance(self._left_widget, CategoryBar) else ""
+        )
         registry = ScriptRegistry()
         try:
             registry.load_manifest()
@@ -58,6 +61,8 @@ class ScriptLauncher(LauncherBase):
                     )
 
             self.set_categories(categories)
+            if current_category_id and isinstance(self._left_widget, CategoryBar):
+                self._left_widget.set_current_category(current_category_id)
             self.set_buttons(buttons)
             return
         except ManifestValidationError as exc:
@@ -72,6 +77,8 @@ class ScriptLauncher(LauncherBase):
                 {"id": "util", "name": "Utilities", "color": "#B8AFD1"},
             ]
         )
+        if current_category_id and isinstance(self._left_widget, CategoryBar):
+            self._left_widget.set_current_category(current_category_id)
         self.set_buttons(
             [
                 {

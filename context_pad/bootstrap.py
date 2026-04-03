@@ -49,6 +49,15 @@ def show_script_launcher() -> ScriptLauncher:
     return _SCRIPT_LAUNCHER
 
 
+def refresh_script_launcher() -> None:
+    """Refresh existing script launcher content in place, when alive."""
+
+    global _SCRIPT_LAUNCHER
+    if _SCRIPT_LAUNCHER is None or not _is_alive(_SCRIPT_LAUNCHER):
+        return
+    _SCRIPT_LAUNCHER.refresh_data()
+
+
 def show_set_launcher() -> SetLauncher:
     """Show the singleton set launcher near the cursor."""
 

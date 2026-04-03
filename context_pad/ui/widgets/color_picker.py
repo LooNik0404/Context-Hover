@@ -25,6 +25,10 @@ class ColorPicker(QtWidgets.QWidget):
             "#4A90E2",
             "#7EA178",
             "#887CB0",
+            "#7E8FA3",
+            "#8F7C66",
+            "#5E8A8A",
+            "#A37A70",
             "#D9822B",
             "#6B7280",
         ]
