@@ -16,6 +16,8 @@ _DEFAULT_SET_NAMES = {
     "initialParticleSE",
     "initialShadingGroup",
 }
+_CONTEXT_PAD_SET_ATTR = "cp_user_selection_set"
+_CONTEXT_PAD_ANNOTATION = "ContextPadSelectionSet"
 
 
 def list_scene_sets() -> List[str]:
@@ -26,7 +28,8 @@ def list_scene_sets() -> List[str]:
         return []
 
     all_sets = cmds.ls(type="objectSet") or []
-    return sorted([item for item in all_sets if item not in _DEFAULT_SET_NAMES and not item.startswith("default")])
+    visible_sets = [item for item in all_sets if _is_user_facing_selection_set(item)]
+    return sorted(visible_sets)
 
 
 def get_current_selection() -> List[str]:
@@ -94,6 +97,7 @@ def create_set_from_selection(name: str) -> bool:
         return False
 
     cmds.sets(selection, name=sanitized_name)
+    _mark_context_pad_set(sanitized_name)
     _log_info(f"Created set '{sanitized_name}' with {len(selection)} members")
     return True
 
@@ -152,6 +156,9 @@ def delete_set(name: str) -> bool:
         return False
     if not cmds.objExists(name):
         _log_warning(f"Cannot delete set: '{name}' does not exist")
+        return False
+    if not _is_user_facing_selection_set(name):
+        _log_warning(f"Refusing to delete non-user-facing set: '{name}'")
         return False
 
     cmds.delete(name)
@@ -262,6 +269,61 @@ def sanitize_set_name(name: str, prefix: str = "set_") -> str:
     if cleaned[0].isdigit():
         cleaned = f"{prefix}{cleaned}"
     return cleaned
+
+
+def _is_user_facing_selection_set(name: str) -> bool:
+    """Return True for animator-facing selection sets only."""
+
+    if not name or name in _DEFAULT_SET_NAMES or name.startswith("default"):
+        return False
+    if cmds is None or not cmds.objExists(name):
+        return False
+    if _is_material_or_technical_set(name):
+        return False
+
+    members = cmds.sets(name, query=True) or []
+    if not members:
+        return False
+
+    return True
+
+
+def _is_material_or_technical_set(name: str) -> bool:
+    """Return True when set should be hidden from animator-facing UI."""
+
+    node_type = str(cmds.nodeType(name) or "")
+    if node_type == "shadingEngine":
+        return True
+
+    technical_flags = ["renderableOnlySet", "verticesOnlySet", "edgesOnlySet", "facetsOnlySet", "editPointsOnlySet"]
+    for attr in technical_flags:
+        if cmds.attributeQuery(attr, node=name, exists=True):
+            try:
+                if bool(cmds.getAttr(f"{name}.{attr}")):
+                    return True
+            except Exception:
+                pass
+
+    partitions = cmds.listConnections(name, type="partition") or []
+    if any(part == "renderPartition" for part in partitions):
+        return True
+
+    return False
+
+
+def _mark_context_pad_set(name: str) -> None:
+    """Mark newly created sets so they are clearly user-facing in future sessions."""
+
+    if cmds is None or not cmds.objExists(name):
+        return
+    if not cmds.attributeQuery(_CONTEXT_PAD_SET_ATTR, node=name, exists=True):
+        cmds.addAttr(name, longName=_CONTEXT_PAD_SET_ATTR, attributeType="bool")
+    cmds.setAttr(f"{name}.{_CONTEXT_PAD_SET_ATTR}", True)
+    if cmds.attributeQuery("annotation", node=name, exists=True):
+        try:
+            cmds.setAttr(f"{name}.annotation", _CONTEXT_PAD_ANNOTATION, type="string")
+        except Exception:
+            pass
 
 def _set_members(name: str) -> Optional[List[str]]:
     """Return set members or None when set is unavailable."""
