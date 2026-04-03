@@ -60,6 +60,29 @@ def show_set_launcher() -> SetLauncher:
     return _SET_LAUNCHER
 
 
+
+
+def hide_script_launcher() -> None:
+    """Hide/close script launcher unless pinned."""
+
+    global _SCRIPT_LAUNCHER
+    if _SCRIPT_LAUNCHER is None or not _is_alive(_SCRIPT_LAUNCHER):
+        return
+    if _SCRIPT_LAUNCHER.is_pinned():
+        return
+    _SCRIPT_LAUNCHER.close()
+
+
+def hide_set_launcher() -> None:
+    """Hide/close set launcher unless pinned."""
+
+    global _SET_LAUNCHER
+    if _SET_LAUNCHER is None or not _is_alive(_SET_LAUNCHER):
+        return
+    if _SET_LAUNCHER.is_pinned():
+        return
+    _SET_LAUNCHER.close()
+
 def launch_script_overlay() -> ScriptLauncher:
     """Compatibility alias for showing the script launcher."""
 

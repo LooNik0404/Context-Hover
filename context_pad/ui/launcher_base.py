@@ -123,6 +123,11 @@ class LauncherBase(QtWidgets.QWidget):
         self._is_pinned = state
         self._utility_bar.set_pinned(state)
 
+    def is_pinned(self) -> bool:
+        """Return current pin state."""
+
+        return self._is_pinned
+
     def on_add_requested(self) -> None:
         """Placeholder callback for future quick-create action."""
 

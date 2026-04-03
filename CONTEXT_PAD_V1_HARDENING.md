@@ -102,3 +102,32 @@ A technical animator should be able to:
 - Requires Maya runtime for full set and MEL behavior.
 - Related updates are polling-based while pinned.
 - No formal CI for Maya UI interactions in this stage.
+
+
+## Press/Release hotkey snippets (hold-to-show)
+
+### Script hover
+Press command:
+```python
+from context_pad.bootstrap import show_script_launcher
+show_script_launcher()
+```
+Release command:
+```python
+from context_pad.bootstrap import hide_script_launcher
+hide_script_launcher()
+```
+
+### Set hover
+Press command:
+```python
+from context_pad.bootstrap import show_set_launcher
+show_set_launcher()
+```
+Release command:
+```python
+from context_pad.bootstrap import hide_set_launcher
+hide_set_launcher()
+```
+
+`hide_*` keeps pinned launchers visible and closes only unpinned launchers.

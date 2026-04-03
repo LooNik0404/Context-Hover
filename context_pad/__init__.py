@@ -25,6 +25,22 @@ def show_script_launcher():
     return _show()
 
 
+def hide_script_launcher():
+    """Lazy import and hide script launcher unless pinned."""
+
+    from .bootstrap import hide_script_launcher as _hide
+
+    return _hide()
+
+
+def hide_set_launcher():
+    """Lazy import and hide set launcher unless pinned."""
+
+    from .bootstrap import hide_set_launcher as _hide
+
+    return _hide()
+
+
 def show_set_launcher():
     """Lazy import and show set launcher."""
 
@@ -33,4 +49,4 @@ def show_set_launcher():
     return _show()
 
 
-__all__ = ["launch_context_pad", "show_manager_window", "show_script_launcher", "show_set_launcher"]
+__all__ = ["launch_context_pad", "show_manager_window", "show_script_launcher", "hide_script_launcher", "show_set_launcher", "hide_set_launcher"]

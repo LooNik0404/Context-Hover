@@ -170,6 +170,21 @@ class ManagerWindow(QtWidgets.QMainWindow):
         layout.addWidget(hint)
         return tab
 
+
+    def open_button_setup_tab(self) -> None:
+        """Switch manager to Button Setup tab."""
+
+        self._tabs.setCurrentIndex(0)
+
+    def start_quick_add_button(self) -> None:
+        """Start quick add button flow from external launcher actions."""
+
+        self.open_button_setup_tab()
+        if not self._current_category_id():
+            if self._category_list.count() > 0:
+                self._category_list.setCurrentRow(0)
+        self._add_button()
+
     def _refresh_all(self) -> None:
         self._editor.reload()
         self._refresh_categories()

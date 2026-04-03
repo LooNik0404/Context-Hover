@@ -98,3 +98,27 @@ class ScriptLauncher(LauncherBase):
                 },
             ]
         )
+
+
+    def on_add_requested(self) -> None:
+        """Open manager and start quick script-button creation."""
+
+        try:
+            from context_pad.bootstrap import show_manager_window
+
+            manager = show_manager_window()
+            manager.open_button_setup_tab()
+            manager.start_quick_add_button()
+        except Exception as exc:
+            print(f"[ContextPad:ScriptLauncher][WARN] Could not start quick add: {exc}")
+
+    def on_manager_requested(self) -> None:
+        """Open manager window from ellipsis icon."""
+
+        try:
+            from context_pad.bootstrap import show_manager_window
+
+            manager = show_manager_window()
+            manager.open_button_setup_tab()
+        except Exception as exc:
+            print(f"[ContextPad:ScriptLauncher][WARN] Could not open manager: {exc}")
