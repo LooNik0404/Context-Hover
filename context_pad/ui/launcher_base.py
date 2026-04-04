@@ -89,6 +89,11 @@ class LauncherBase(QtWidgets.QWidget):
 
         self._utility_bar.set_manager_visible(visible)
 
+    def set_manager_button_text(self, text: str) -> None:
+        """Set manager button glyph/text in top utility zone."""
+
+        self._utility_bar.set_manager_text(text)
+
     def set_left_widget(self, widget: QtWidgets.QWidget) -> None:
         """Replace left column widget with a custom widget."""
 

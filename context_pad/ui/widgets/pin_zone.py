@@ -54,6 +54,11 @@ class PinZone(QtWidgets.QFrame):
 
         self._manager_button.setVisible(visible)
 
+    def set_manager_text(self, text: str) -> None:
+        """Set manager utility button glyph/text."""
+
+        self._manager_button.setText(text)
+
     def _on_pin_toggled(self, state: bool) -> None:
         """Emit pin changes using a minimal dot-state icon."""
 

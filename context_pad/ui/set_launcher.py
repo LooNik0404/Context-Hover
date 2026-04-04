@@ -10,6 +10,7 @@ from context_pad.maya_integration.qt_helpers import QtCore, QtWidgets
 
 from .launcher_base import LauncherBase
 from .widgets.related_sets import RelatedSetsList
+from .widgets.set_visibility_dialog import SetVisibilityDialog
 
 
 class SetLauncher(LauncherBase):
@@ -36,7 +37,8 @@ class SetLauncher(LauncherBase):
         self._related_widget = RelatedSetsList()
         self._related_widget.related_selected.connect(self._select_set_from_related)
         self.set_left_widget(self._related_widget)
-        self.set_manager_button_visible(False)
+        self.set_manager_button_visible(True)
+        self.set_manager_button_text("◉")
 
         self._last_selection: List[str] = []
         self._watch_timer = QtCore.QTimer(self)
@@ -91,14 +93,11 @@ class SetLauncher(LauncherBase):
             self._toast("Could not create set")
 
     def on_manager_requested(self) -> None:
-        """Open manager window as secondary utility."""
+        """Open compact visibility manager dialog for set show/hide."""
 
-        try:
-            from context_pad.bootstrap import launch_context_pad
-
-            launch_context_pad()
-        except Exception:
-            self._toast("Unable to open manager")
+        dialog = SetVisibilityDialog(registry=self._sets, parent=self)
+        dialog.exec_()
+        self.refresh_from_scene()
 
     def set_pinned(self, state: bool) -> None:
         """Toggle pin state and selection watch behavior."""
@@ -137,7 +136,7 @@ class SetLauncher(LauncherBase):
         records: List[Dict[str, str]] = []
         for set_name in self._sets.list_scene_sets():
             meta = state.get(set_name, {})
-            if bool(meta.get("hidden_state", False)):
+            if bool(meta.get("hidden_in_launcher", False)):
                 continue
             group = str(meta.get("group", "Main"))
             records.append(
@@ -171,7 +170,7 @@ class SetLauncher(LauncherBase):
         related_records: List[Dict[str, str]] = []
         for name in related_names[: self._RELATED_LIMIT]:
             meta = state.get(name, {})
-            if bool(meta.get("hidden_state", False)):
+            if bool(meta.get("hidden_in_launcher", False)):
                 continue
             related_records.append(
                 {
@@ -210,6 +209,7 @@ class SetLauncher(LauncherBase):
         self._context_menu_active = True
         menu = QtWidgets.QMenu(self)
         action_rename = menu.addAction("Rename")
+        action_hide = menu.addAction("Hide from Launcher")
         action_delete = menu.addAction("Delete")
         action_color = menu.addAction("Change Color")
         action_update = menu.addAction("Update from Selection")
@@ -218,6 +218,8 @@ class SetLauncher(LauncherBase):
         try:
             if selected is action_rename:
                 self._rename_set(set_name)
+            elif selected is action_hide:
+                self._set_hidden_in_launcher(set_name, hidden=True)
             elif selected is action_delete:
                 self._delete_set(set_name)
             elif selected is action_color:
@@ -260,6 +262,10 @@ class SetLauncher(LauncherBase):
             self._toast("Could not rename set")
 
     def _delete_set(self, set_name: str) -> None:
+        if self._sets.is_referenced_set(set_name):
+            self._toast("Referenced sets cannot be deleted")
+            return
+
         self._context_menu_active = True
         confirm = QtWidgets.QMessageBox.question(self, "Delete Set", f"Delete set '{set_name}'?")
         self._context_menu_active = False
@@ -272,6 +278,16 @@ class SetLauncher(LauncherBase):
             self._toast(f"Deleted: {set_name}")
         else:
             self._toast("Could not delete set")
+
+    def _set_hidden_in_launcher(self, set_name: str, hidden: bool) -> None:
+        """Store reversible launcher visibility for full set name key."""
+
+        state = self._sets.refresh_scene_set_ui_state()
+        state.setdefault(set_name, {})
+        state[set_name]["hidden_in_launcher"] = bool(hidden)
+        self._sets.save_scene_set_ui_state(state)
+        self.refresh_from_scene()
+        self._toast(f"{'Hidden' if hidden else 'Shown'} in launcher: {set_name}")
 
     def _change_set_color(self, set_name: str) -> None:
         self._context_menu_active = True

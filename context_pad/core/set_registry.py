@@ -70,6 +70,11 @@ class SetRegistry:
 
         return maya_sets.get_set_size(name)
 
+    def is_referenced_set(self, name: str) -> bool:
+        """Return True when set node comes from a Maya reference."""
+
+        return maya_sets.is_referenced_set(name)
+
     def get_related_sets_for_selection(
         self,
         selection: Optional[List[str]] = None,

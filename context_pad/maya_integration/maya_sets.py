@@ -157,6 +157,9 @@ def delete_set(name: str) -> bool:
     if not cmds.objExists(name):
         _log_warning(f"Cannot delete set: '{name}' does not exist")
         return False
+    if is_referenced_set(name):
+        _log_warning(f"Cannot delete referenced set: '{name}'")
+        return False
     if not _is_user_facing_selection_set(name):
         _log_warning(f"Refusing to delete non-user-facing set: '{name}'")
         return False
@@ -188,6 +191,17 @@ def get_set_size(name: str) -> int:
 
     members = _set_members(name)
     return len(members) if members is not None else 0
+
+
+def is_referenced_set(name: str) -> bool:
+    """Return True if the set node is referenced from an external file."""
+
+    if cmds is None or not cmds.objExists(name):
+        return False
+    try:
+        return bool(cmds.referenceQuery(name, isNodeReferenced=True))
+    except Exception:
+        return False
 
 
 def get_related_sets_for_selection(selection: Optional[List[str]] = None, require_all: bool = True) -> List[str]:

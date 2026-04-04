@@ -19,7 +19,7 @@ _DEFAULT_SET_STATE: Dict[str, Any] = {
     "display_order": 1000,
     "button_color": "#6B7280",
     "group": "Default",
-    "hidden_state": False,
+    "hidden_in_launcher": False,
 }
 
 
@@ -132,11 +132,14 @@ def _merge_defaults(state: Dict[str, Any]) -> Dict[str, Any]:
 
     merged = dict(_DEFAULT_SET_STATE)
     merged.update(state)
+    if "hidden_in_launcher" not in merged and "hidden_state" in merged:
+        merged["hidden_in_launcher"] = merged.get("hidden_state", False)
+    merged.pop("hidden_state", None)
 
     merged["display_order"] = int(merged.get("display_order", _DEFAULT_SET_STATE["display_order"]))
     merged["button_color"] = str(merged.get("button_color", _DEFAULT_SET_STATE["button_color"]))
     merged["group"] = str(merged.get("group", _DEFAULT_SET_STATE["group"]))
-    merged["hidden_state"] = bool(merged.get("hidden_state", _DEFAULT_SET_STATE["hidden_state"]))
+    merged["hidden_in_launcher"] = bool(merged.get("hidden_in_launcher", _DEFAULT_SET_STATE["hidden_in_launcher"]))
     return merged
 
 
