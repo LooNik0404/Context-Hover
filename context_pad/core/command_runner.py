@@ -65,6 +65,10 @@ def run_button_action(button_data: Dict[str, Any]) -> bool:
                 _log_info(f"Success: {label}")
                 return True
 
+            if action_type == "separator":
+                _log_info(f"Skipping non-executable separator item: {label}")
+                return True
+
             _log_error(f"Unsupported action type '{action_type}' for button '{label}'")
             return False
 

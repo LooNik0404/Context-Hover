@@ -17,7 +17,7 @@ class ScriptLauncher(LauncherBase):
 
         super().__init__(parent=parent)
         self.setWindowTitle("Context Pad")
-        self.set_button_columns(2)
+        self.set_button_columns(4)
 
         category_widget = CategoryBar()
         category_widget.set_title("Categories")
@@ -54,6 +54,8 @@ class ScriptLauncher(LauncherBase):
                             "source": item["source"],
                             "label": item["label"],
                             "tooltip": item.get("tooltip", ""),
+                            "item_type": item.get("item_type", "button"),
+                            "button_size": item.get("button_size", "normal"),
                             "code": item["source"] if item["action_type"].endswith("inline") else "",
                             "file_path": item["source"] if item["action_type"].endswith("file") else "",
                             "manifest_dir": manifest_dir,
@@ -91,6 +93,8 @@ class ScriptLauncher(LauncherBase):
                     "source": "print('Bake Keys placeholder')",
                     "code": "print('Bake Keys placeholder')",
                     "file_path": "",
+                    "item_type": "button",
+                    "button_size": "normal",
                 },
                 {
                     "id": "scr_2",
@@ -102,6 +106,8 @@ class ScriptLauncher(LauncherBase):
                     "source": "print('Mirror Pose placeholder')",
                     "code": "print('Mirror Pose placeholder')",
                     "file_path": "",
+                    "item_type": "button",
+                    "button_size": "normal",
                 },
             ]
         )
@@ -109,6 +115,8 @@ class ScriptLauncher(LauncherBase):
     def _on_script_clicked(self, payload: dict) -> None:
         """Run script action and close launcher on successful unpinned click."""
 
+        if str(payload.get("item_type", "button")) == "separator":
+            return
         success = run_button_action(payload)
         if success and not self.is_pinned():
             self.close()

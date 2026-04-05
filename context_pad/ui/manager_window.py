@@ -58,6 +58,7 @@ class ManagerWindow(QtWidgets.QMainWindow):
         toolbar = QtWidgets.QHBoxLayout()
         toolbar.setSpacing(6)
         btn_add = QtWidgets.QPushButton("Add")
+        btn_add_separator = QtWidgets.QPushButton("Add Separator")
         btn_rename = QtWidgets.QPushButton("Rename")
         btn_delete = QtWidgets.QPushButton("Delete")
         btn_up = QtWidgets.QPushButton("Move Up")
@@ -85,18 +86,20 @@ class ManagerWindow(QtWidgets.QMainWindow):
         toolbar = QtWidgets.QHBoxLayout()
         toolbar.setSpacing(6)
         btn_add = QtWidgets.QPushButton("Add")
+        btn_add_separator = QtWidgets.QPushButton("Add Separator")
         btn_rename = QtWidgets.QPushButton("Rename")
         btn_delete = QtWidgets.QPushButton("Delete")
         btn_up = QtWidgets.QPushButton("Move Up")
         btn_down = QtWidgets.QPushButton("Move Down")
 
         btn_add.clicked.connect(self._add_button)
+        btn_add_separator.clicked.connect(self._add_separator)
         btn_rename.clicked.connect(self._rename_button)
         btn_delete.clicked.connect(self._delete_button)
         btn_up.clicked.connect(lambda: self._move_button(-1))
         btn_down.clicked.connect(lambda: self._move_button(1))
 
-        for widget in [btn_add, btn_rename, btn_delete, btn_up, btn_down]:
+        for widget in [btn_add, btn_add_separator, btn_rename, btn_delete, btn_up, btn_down]:
             toolbar.addWidget(widget)
         layout.addLayout(toolbar)
         return panel
@@ -108,12 +111,15 @@ class ManagerWindow(QtWidgets.QMainWindow):
         self._prop_name = QtWidgets.QLineEdit()
         self._prop_category = QtWidgets.QComboBox()
         self._prop_color = ColorPicker()
+        self._prop_size = QtWidgets.QComboBox()
+        self._prop_size.addItems(["Normal", "Small"])
 
         btn_apply = QtWidgets.QPushButton("Apply Properties")
         btn_apply.clicked.connect(self._apply_properties)
 
         form.addRow("Button Name", self._prop_name)
         form.addRow("Category", self._prop_category)
+        form.addRow("Size", self._prop_size)
         form.addRow("Color", self._prop_color)
         form.addRow(btn_apply)
         return panel
@@ -218,7 +224,11 @@ class ManagerWindow(QtWidgets.QMainWindow):
         selected_button = self._active_button_id
         self._button_list.clear()
         for item in self._buttons_for_current_category():
-            row = QtWidgets.QListWidgetItem(item.get("label", "Unnamed"))
+            item_type = str(item.get("item_type", "button"))
+            label = str(item.get("label", "Unnamed"))
+            if item_type == "separator":
+                label = f"── {label or 'Separator'}"
+            row = QtWidgets.QListWidgetItem(label)
             row.setData(QtCore.Qt.UserRole, item.get("id", ""))
             row.setIcon(self._make_color_icon(str(item.get("color", "#6B7280"))))
             self._button_list.addItem(row)
@@ -255,13 +265,15 @@ class ManagerWindow(QtWidgets.QMainWindow):
     def _sync_selection_views(self) -> None:
         button = self._selected_button()
         has_selection = button is not None
+        is_separator = bool(button and str(button.get("item_type", "button")) == "separator")
 
         self._prop_name.setEnabled(has_selection)
         self._prop_category.setEnabled(has_selection)
-        self._prop_color.setEnabled(has_selection)
-        self._code_language.setEnabled(has_selection)
-        self._code_editor.setEnabled(has_selection)
-        self._code_tooltip.setEnabled(has_selection)
+        self._prop_size.setEnabled(has_selection and not is_separator)
+        self._prop_color.setEnabled(has_selection and not is_separator)
+        self._code_language.setEnabled(has_selection and not is_separator)
+        self._code_editor.setEnabled(has_selection and not is_separator)
+        self._code_tooltip.setEnabled(has_selection and not is_separator)
 
         if not button:
             self._prop_name.clear()
@@ -278,15 +290,23 @@ class ManagerWindow(QtWidgets.QMainWindow):
         category_label = self._category_label(category_id)
         color = button.get("color", "#6B7280")
         action_type = button.get("action_type", "python_inline")
+        button_size = str(button.get("button_size", "normal")).lower()
 
         self._prop_name.setText(label)
         self._prop_color.set_color(color)
         self._prop_category.setCurrentIndex(max(0, self._prop_category.findData(category_id)))
+        self._prop_size.setCurrentText("Small" if button_size == "small" else "Normal")
 
         self._selection_label.setText(f"{category_label} > {label}")
         self._selection_swatch.setStyleSheet(
             f"background:{color}; border:1px solid rgba(255,255,255,70); border-radius:3px;"
         )
+
+        if is_separator:
+            self._code_language.setCurrentText("Python")
+            self._code_editor.setPlainText("")
+            self._code_tooltip.setText("")
+            return
 
         self._code_language.setCurrentText("Python" if action_type.startswith("python") else "MEL")
         source_value = button.get("source", "")
@@ -388,12 +408,43 @@ class ManagerWindow(QtWidgets.QMainWindow):
                 "action_type": "python_inline",
                 "source": "",
                 "tooltip": "",
+                "item_type": "button",
+                "button_size": "normal",
             }
         )
         self._refresh_buttons()
         self._active_button_id = self._current_button_id() or self._active_button_id
         self._sync_selection_views()
         self._status.setText("Button added")
+
+    def _add_separator(self) -> None:
+        """Create a non-executable visual separator item in current category."""
+
+        category_id = self._current_category_id()
+        if not category_id:
+            self._status.setText("Select a category first")
+            return
+
+        label, ok = QtWidgets.QInputDialog.getText(self, "Add Separator", "Separator label")
+        if not ok:
+            return
+
+        self._editor.add_button(
+            {
+                "label": label.strip() or "Separator",
+                "category_id": category_id,
+                "color": "#6B7280",
+                "action_type": "separator",
+                "source": "",
+                "tooltip": "",
+                "item_type": "separator",
+                "button_size": "normal",
+            }
+        )
+        self._refresh_buttons()
+        self._active_button_id = self._current_button_id() or self._active_button_id
+        self._sync_selection_views()
+        self._status.setText("Separator added")
 
     def _rename_button(self) -> None:
         button = self._selected_button()
@@ -433,10 +484,14 @@ class ManagerWindow(QtWidgets.QMainWindow):
             return
 
         category_id = str(self._prop_category.currentData() or button.get("category_id", ""))
+        item_type = str(button.get("item_type", "button"))
+        size_mode = "small" if self._prop_size.currentText() == "Small" else "normal"
         payload = {
             "label": self._prop_name.text().strip() or button.get("label", "Button"),
             "category_id": category_id,
             "color": self._prop_color.color(),
+            "button_size": size_mode,
+            "item_type": item_type,
         }
         self._editor.update_button(button["id"], payload)
         self._refresh_buttons()
@@ -449,8 +504,25 @@ class ManagerWindow(QtWidgets.QMainWindow):
             self._status.setText("Select a button in Button Setup")
             return
 
+        if str(button.get("item_type", "button")) == "separator":
+            payload = {
+                "label": self._prop_name.text().strip() or button.get("label", "Separator"),
+                "category_id": str(self._prop_category.currentData() or button.get("category_id", "")),
+                "action_type": "separator",
+                "source": "",
+                "tooltip": "",
+                "item_type": "separator",
+                "button_size": "normal",
+            }
+            self._editor.update_button(button["id"], payload)
+            self._refresh_buttons()
+            self._sync_selection_views()
+            self._status.setText("Separator updated")
+            return
+
         language = self._code_language.currentText()
         action_type = "python_inline" if language == "Python" else "mel_inline"
+        size_mode = "small" if self._prop_size.currentText() == "Small" else "normal"
         payload = {
             "label": self._prop_name.text().strip() or button.get("label", "Button"),
             "category_id": str(self._prop_category.currentData() or button.get("category_id", "")),
@@ -458,6 +530,8 @@ class ManagerWindow(QtWidgets.QMainWindow):
             "tooltip": self._code_tooltip.text().strip(),
             "action_type": action_type,
             "source": self._code_editor.toPlainText(),
+            "item_type": "button",
+            "button_size": size_mode,
         }
         self._editor.update_button(button["id"], payload)
         self._refresh_buttons()

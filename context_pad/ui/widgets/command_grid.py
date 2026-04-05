@@ -51,10 +51,22 @@ class CommandGrid(QtWidgets.QWidget):
     def _set_visible_buttons(self, buttons: List[Dict[str, str]]) -> None:
         """Rebuild only when visible ids actually changed."""
 
-        visible_ids = [str(item.get("id", "")) for item in buttons]
-        if visible_ids == self._visible_button_ids:
+        visible_fingerprint = [
+            "|".join(
+                [
+                    str(item.get("id", "")),
+                    str(item.get("name", "")),
+                    str(item.get("color", "")),
+                    str(item.get("tooltip", "")),
+                    str(item.get("item_type", "button")),
+                    str(item.get("button_size", "normal")),
+                ]
+            )
+            for item in buttons
+        ]
+        if visible_fingerprint == self._visible_button_ids:
             return
-        self._visible_button_ids = visible_ids
+        self._visible_button_ids = visible_fingerprint
         self._rebuild_grid(buttons)
 
     def _rebuild_grid(self, buttons: List[Dict[str, str]]) -> None:
@@ -66,7 +78,19 @@ class CommandGrid(QtWidgets.QWidget):
             if widget is not None:
                 widget.deleteLater()
 
-        for index, item_data in enumerate(buttons):
+        row = 0
+        col = 0
+        for item_data in buttons:
+            item_type = str(item_data.get("item_type", "button"))
+            if item_type == "separator":
+                if col != 0:
+                    row += 1
+                    col = 0
+                separator = self._make_separator_widget(item_data)
+                self._layout.addWidget(separator, row, 0, 1, self._columns)
+                row += 1
+                continue
+
             button_name = item_data.get("name", "Button")
             button = QtWidgets.QPushButton(button_name)
             button.setObjectName("ContextPadCommandButton")
@@ -85,11 +109,44 @@ class CommandGrid(QtWidgets.QWidget):
                 lambda pos, data=item_data, b=button: self.button_context_requested.emit(data, b.mapToGlobal(pos))
             )
 
-            row = index // self._columns
-            col = index % self._columns
-            self._layout.addWidget(button, row, col)
+            size_mode = str(item_data.get("button_size", "normal")).lower()
+            col_span = 1 if size_mode == "small" else min(2, self._columns)
+            if col + col_span > self._columns:
+                row += 1
+                col = 0
 
-        self._layout.setRowStretch((len(buttons) // self._columns) + 1, 1)
+            self._layout.addWidget(button, row, col, 1, col_span)
+            col += col_span
+            if col >= self._columns:
+                row += 1
+                col = 0
+
+        self._layout.setRowStretch(row + 1, 1)
+
+    def _make_separator_widget(self, item_data: Dict[str, str]) -> QtWidgets.QWidget:
+        """Create subtle full-width separator widget with optional muted label."""
+
+        container = QtWidgets.QWidget(self)
+        layout = QtWidgets.QHBoxLayout(container)
+        layout.setContentsMargins(2, 4, 2, 4)
+        layout.setSpacing(6)
+
+        line_left = QtWidgets.QFrame(container)
+        line_left.setFrameShape(QtWidgets.QFrame.HLine)
+        line_left.setStyleSheet("color: rgba(220,220,220,45);")
+        layout.addWidget(line_left, 1)
+
+        label_text = str(item_data.get("name", "")).strip()
+        if label_text:
+            label = QtWidgets.QLabel(label_text, container)
+            label.setStyleSheet("color: rgba(220,220,220,110); font-size: 10px;")
+            layout.addWidget(label, 0)
+
+        line_right = QtWidgets.QFrame(container)
+        line_right.setFrameShape(QtWidgets.QFrame.HLine)
+        line_right.setStyleSheet("color: rgba(220,220,220,45);")
+        layout.addWidget(line_right, 1)
+        return container
 
     def _contrast_color(self, color: QtGui.QColor) -> QtGui.QColor:
         """Return black/white text color based on luminance contrast."""

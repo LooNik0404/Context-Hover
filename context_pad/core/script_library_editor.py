@@ -115,6 +115,8 @@ class ScriptLibraryEditor:
             "action_type": payload.get("action_type", "python_inline"),
             "source": payload.get("source", ""),
             "tooltip": payload.get("tooltip", ""),
+            "item_type": payload.get("item_type", "button"),
+            "button_size": payload.get("button_size", "normal"),
             "sort_order": self._next_sort(buttons),
             "submenu_id": payload.get("submenu_id"),
         }
@@ -128,7 +130,17 @@ class ScriptLibraryEditor:
         if not button:
             return False
 
-        for key in ["label", "category_id", "color", "action_type", "source", "tooltip", "submenu_id"]:
+        for key in [
+            "label",
+            "category_id",
+            "color",
+            "action_type",
+            "source",
+            "tooltip",
+            "submenu_id",
+            "item_type",
+            "button_size",
+        ]:
             if key in payload:
                 button[key] = payload[key]
         return True

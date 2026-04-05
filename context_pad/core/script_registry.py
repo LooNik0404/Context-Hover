@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from context_pad.config import DEFAULT_CONFIG, PACKAGE_ROOT
 
-_ALLOWED_ACTION_TYPES = {"python_inline", "python_file", "mel_inline", "mel_file"}
+_ALLOWED_ACTION_TYPES = {"python_inline", "python_file", "mel_inline", "mel_file", "separator"}
 
 
 class ManifestValidationError(ValueError):
@@ -38,6 +38,8 @@ class ScriptButton:
     source: str
     tooltip: str
     sort_order: int
+    item_type: str = "button"
+    button_size: str = "normal"
     submenu_id: Optional[str] = None
 
 
@@ -134,6 +136,12 @@ class ScriptRegistry:
                 raise ManifestValidationError(
                     f"{path}.action_type '{action_type}' is unsupported"
                 )
+            item_type = str(button.get("item_type", "button"))
+            if item_type not in {"button", "separator"}:
+                raise ManifestValidationError(f"{path}.item_type '{item_type}' is unsupported")
+            button_size = str(button.get("button_size", "normal"))
+            if button_size not in {"normal", "small"}:
+                raise ManifestValidationError(f"{path}.button_size '{button_size}' is unsupported")
 
             submenu_id = button.get("submenu_id")
             if submenu_id is not None and str(submenu_id) not in submenu_ids:
@@ -185,6 +193,8 @@ class ScriptRegistry:
                 "source": item.source,
                 "tooltip": item.tooltip,
                 "sort_order": item.sort_order,
+                "item_type": item.item_type,
+                "button_size": item.button_size,
                 "submenu_id": item.submenu_id,
             }
             for item in self._buttons
@@ -223,6 +233,8 @@ class ScriptRegistry:
                 source=str(item["source"]),
                 tooltip=str(item["tooltip"]),
                 sort_order=int(item["sort_order"]),
+                item_type=str(item.get("item_type", "button")),
+                button_size=str(item.get("button_size", "normal")),
                 submenu_id=str(item["submenu_id"]) if item.get("submenu_id") is not None else None,
             )
             for item in data.get("buttons", [])
