@@ -27,9 +27,18 @@ def list_scene_sets() -> List[str]:
         _log_warning("Maya cmds unavailable; list_scene_sets returning empty list")
         return []
 
-    all_sets = cmds.ls(type="objectSet") or []
-    visible_sets = [item for item in all_sets if _is_user_facing_selection_set(item)]
+    candidate_sets = _candidate_scene_sets()
+    visible_sets = [item for item in candidate_sets if _is_user_facing_selection_set(item)]
     return sorted(visible_sets)
+
+
+def _candidate_scene_sets() -> List[str]:
+    """Return raw non-default objectSet candidates before launcher-facing filtering."""
+
+    if cmds is None:
+        return []
+    all_sets = cmds.ls(type="objectSet") or []
+    return [item for item in all_sets if item not in _DEFAULT_SET_NAMES and not item.startswith("default")]
 
 
 def get_current_selection() -> List[str]:
@@ -335,6 +344,9 @@ def _is_user_facing_selection_set(name: str) -> bool:
     if not members:
         return False
 
+    if is_referenced_set(name):
+        return _has_context_pad_marker(name) or _has_user_annotation(name)
+
     return True
 
 
@@ -374,6 +386,33 @@ def _mark_context_pad_set(name: str) -> None:
             cmds.setAttr(f"{name}.annotation", _CONTEXT_PAD_ANNOTATION, type="string")
         except Exception:
             pass
+
+
+def _has_context_pad_marker(name: str) -> bool:
+    """Return True when set has explicit Context Pad marker attribute enabled."""
+
+    if cmds is None or not cmds.objExists(name):
+        return False
+    if not cmds.attributeQuery(_CONTEXT_PAD_SET_ATTR, node=name, exists=True):
+        return False
+    try:
+        return bool(cmds.getAttr(f"{name}.{_CONTEXT_PAD_SET_ATTR}"))
+    except Exception:
+        return False
+
+
+def _has_user_annotation(name: str) -> bool:
+    """Return True when set has non-empty annotation text indicating user intent."""
+
+    if cmds is None or not cmds.objExists(name):
+        return False
+    if not cmds.attributeQuery("annotation", node=name, exists=True):
+        return False
+    try:
+        annotation = str(cmds.getAttr(f"{name}.annotation") or "").strip()
+    except Exception:
+        return False
+    return bool(annotation)
 
 def _set_members(name: str) -> Optional[List[str]]:
     """Return set members or None when set is unavailable."""

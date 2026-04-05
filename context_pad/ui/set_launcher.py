@@ -31,7 +31,7 @@ class SetLauncher(LauncherBase):
     def __init__(self, parent=None) -> None:
         super().__init__(parent=parent)
         self.setWindowTitle("Context Pad - Sets")
-        self.set_button_columns(2)
+        self.set_button_columns(1)
 
         self._sets = SetRegistry()
         self._related_widget = RelatedSetsList()
@@ -142,10 +142,11 @@ class SetLauncher(LauncherBase):
             records.append(
                 {
                     "id": set_name,
-                    "name": set_name,
+                    "name": self._elide_label(self._display_label(set_name)),
                     "category_id": group,
                     "color": str(meta.get("button_color", "#6B7280")),
                     "display_order": int(meta.get("display_order", 1000)),
+                    "tooltip": set_name,
                 }
             )
 
@@ -175,8 +176,9 @@ class SetLauncher(LauncherBase):
             related_records.append(
                 {
                     "id": name,
-                    "name": name,
+                    "name": self._elide_label(self._display_label(name)),
                     "color": str(meta.get("button_color", "#6B7280")),
+                    "tooltip": name,
                 }
             )
         return related_records
@@ -366,6 +368,20 @@ class SetLauncher(LauncherBase):
             return (usage.get(color, 0), repeat_penalty)
 
         return sorted(palette_values, key=score)[0]
+
+    def _display_label(self, full_set_name: str) -> str:
+        """Return namespace-free display label while keeping full name internal."""
+
+        short_name = str(full_set_name).split("|")[-1]
+        return short_name.split(":")[-1]
+
+    def _elide_label(self, label: str, max_chars: int = 28) -> str:
+        """Elide long labels to keep single-column set list compact and readable."""
+
+        text = str(label)
+        if len(text) <= max_chars:
+            return text
+        return f"{text[: max(1, max_chars - 1)]}…"
 
 
     def _log_warning(self, message: str) -> None:
