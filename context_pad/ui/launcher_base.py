@@ -45,6 +45,7 @@ class LauncherBase(QtWidgets.QWidget):
         self._utility_bar = PinZone()
         self._utility_bar.pin_toggled.connect(self.set_pinned)
         self._utility_bar.add_clicked.connect(self.on_add_requested)
+        self._utility_bar.add_context_requested.connect(self.on_add_context_requested)
         self._utility_bar.manager_clicked.connect(self.on_manager_requested)
         self._utility_bar.installEventFilter(self)
         top_bar.addWidget(self._utility_bar, 1)
@@ -147,6 +148,9 @@ class LauncherBase(QtWidgets.QWidget):
 
     def on_add_requested(self) -> None:
         """Placeholder callback for future quick-create action."""
+
+    def on_add_context_requested(self, global_pos: object) -> None:
+        """Placeholder callback for plus-button RMB actions."""
 
     def on_manager_requested(self) -> None:
         """Placeholder callback for opening manager window."""

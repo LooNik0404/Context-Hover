@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from context_pad.maya_integration import maya_scene_meta, maya_sets
 
@@ -84,6 +84,11 @@ class SetRegistry:
 
         return maya_sets.get_related_sets_for_selection(selection=selection, require_all=require_all)
 
+    def list_reference_sets(self, prepared_only: bool = True) -> List[str]:
+        """List referenced sets for import into scene-local Context Pad library."""
+
+        return maya_sets.list_reference_sets(prepared_only=prepared_only)
+
     def ensure_scene_meta_node(self) -> str:
         """Ensure dedicated scene metadata node exists."""
 
@@ -113,3 +118,33 @@ class SetRegistry:
         """Normalize user-entered set name to Maya-safe identifier."""
 
         return maya_sets.sanitize_set_name(name)
+
+    def load_scene_set_library(self) -> Dict[str, Dict[str, Any]]:
+        """Load scene-local set library entries."""
+
+        return maya_scene_meta.load_scene_set_library()
+
+    def register_set_library_entry(
+        self,
+        source_ref: str,
+        source_kind: str,
+        display_label: str | None = None,
+        color: str = "#6B7280",
+        hidden_in_launcher: bool = False,
+        is_referenced: bool = False,
+    ) -> str:
+        """Register/update a set entry in scene-local Context Pad library."""
+
+        return maya_scene_meta.register_set_library_entry(
+            source_ref=source_ref,
+            source_kind=source_kind,
+            display_label=display_label,
+            color=color,
+            hidden_in_launcher=hidden_in_launcher,
+            is_referenced=is_referenced,
+        )
+
+    def update_set_library_entry(self, entry_id: str, updates: Dict[str, Any]) -> bool:
+        """Update an existing scene-local set library entry."""
+
+        return maya_scene_meta.update_set_library_entry(entry_id, updates)

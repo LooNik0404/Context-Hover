@@ -10,6 +10,7 @@ class PinZone(QtWidgets.QFrame):
 
     pin_toggled = QtCore.Signal(bool)
     add_clicked = QtCore.Signal()
+    add_context_requested = QtCore.Signal(object)
     manager_clicked = QtCore.Signal()
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
@@ -24,6 +25,8 @@ class PinZone(QtWidgets.QFrame):
 
         self._add_button = self._make_icon_button("+")
         self._add_button.clicked.connect(self.add_clicked)
+        self._add_button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self._add_button.customContextMenuRequested.connect(self._on_add_context_requested)
 
         self._manager_button = self._make_icon_button("⋯")
         self._manager_button.clicked.connect(self.manager_clicked)
@@ -64,6 +67,12 @@ class PinZone(QtWidgets.QFrame):
 
         self._pin_button.setText("●" if state else "○")
         self.pin_toggled.emit(state)
+
+    def _on_add_context_requested(self, local_pos: object) -> None:
+        """Emit global position for plus-button RMB menu."""
+
+        global_pos = self._add_button.mapToGlobal(local_pos)
+        self.add_context_requested.emit(global_pos)
 
     def _make_icon_button(self, glyph: str) -> QtWidgets.QToolButton:
         """Create a tiny icon-style utility button."""

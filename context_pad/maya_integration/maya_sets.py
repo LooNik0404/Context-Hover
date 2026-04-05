@@ -32,6 +32,29 @@ def list_scene_sets() -> List[str]:
     return sorted(visible_sets)
 
 
+def list_reference_sets(prepared_only: bool = True) -> List[str]:
+    """List referenced scene sets for Set Library import workflows."""
+
+    if cmds is None:
+        _log_warning("Maya cmds unavailable; list_reference_sets returning empty list")
+        return []
+
+    candidates = _candidate_scene_sets()
+    found: List[str] = []
+    for set_name in candidates:
+        if not is_referenced_set(set_name):
+            continue
+        if _is_material_or_technical_set(set_name):
+            continue
+        members = cmds.sets(set_name, query=True) or []
+        if not members:
+            continue
+        if prepared_only and not (_has_context_pad_marker(set_name) or _has_user_annotation(set_name)):
+            continue
+        found.append(set_name)
+    return sorted(found)
+
+
 def _candidate_scene_sets() -> List[str]:
     """Return raw non-default objectSet candidates before launcher-facing filtering."""
 

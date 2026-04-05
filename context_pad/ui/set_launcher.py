@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from context_pad.core.set_registry import SetRegistry
 from context_pad.maya_integration.qt_helpers import QtCore, QtWidgets
 
 from .launcher_base import LauncherBase
+from .widgets.reference_set_picker import ReferenceSetPickerDialog
 from .widgets.related_sets import RelatedSetsList
 from .widgets.set_visibility_dialog import SetVisibilityDialog
 
@@ -55,42 +56,52 @@ class SetLauncher(LauncherBase):
         """Refresh all and related sets from scene data."""
 
         state = self._sets.refresh_scene_set_ui_state()
-        all_sets = self._build_all_sets(state)
-        related = self._build_related_sets(state)
+        library = self._sets.load_scene_set_library()
+        all_sets = self._build_all_sets(state, library)
+        related = self._build_related_sets(state, library)
 
         self.set_buttons(all_sets)
         self._related_widget.set_related_sets(related)
         self._last_selection = self._sets.get_current_selection()
 
     def on_add_requested(self) -> None:
-        """Create a set quickly from current selection."""
+        """LMB plus: create a local set from selection and register it."""
 
         current = self._sets.get_current_selection()
         if not current:
             self._toast("Select objects first to create a set")
             return
 
-        default_name = self._suggest_set_name()
-        self._context_menu_active = True
-        name, ok = QtWidgets.QInputDialog.getText(self, "Create Set", "Set name", text=default_name)
-        self._context_menu_active = False
-        if not ok or not name.strip():
-            return
-
-        raw_name = name.strip()
-        new_name = self._sets.sanitize_set_name(raw_name)
-        if new_name != raw_name:
-            self._toast(f"Adjusted set name: {raw_name} → {new_name}")
-            self._log_warning(f"Adjusted set name '{raw_name}' to '{new_name}' for Maya compatibility")
+        new_name = self._sets.sanitize_set_name(self._suggest_set_name())
         if self._sets.create_set_from_selection(new_name):
-            state = self._sets.refresh_scene_set_ui_state()
-            state.setdefault(new_name, {})
-            state[new_name]["button_color"] = self._choose_new_set_color(state)
-            self._sets.save_scene_set_ui_state(state)
+            color = self._choose_new_set_color(state=self._sets.load_scene_set_ui_state())
+            self._sets.register_set_library_entry(
+                source_ref=new_name,
+                source_kind="local_maya_set",
+                display_label=self._display_label(new_name),
+                color=color,
+                hidden_in_launcher=False,
+                is_referenced=False,
+            )
             self.refresh_from_scene()
             self._toast(f"Created set: {new_name}")
         else:
             self._toast("Could not create set")
+
+    def on_add_context_requested(self, global_pos: object) -> None:
+        """RMB plus: show exactly two add actions."""
+
+        self._context_menu_active = True
+        menu = QtWidgets.QMenu(self)
+        action_create = menu.addAction("Create Set from Selection")
+        action_add_ref = menu.addAction("Add Sets from Reference...")
+        selected = menu.exec_(global_pos)
+        self._context_menu_active = False
+
+        if selected is action_create:
+            self.on_add_requested()
+        elif selected is action_add_ref:
+            self._open_reference_add_dialog()
 
     def on_manager_requested(self) -> None:
         """Open compact visibility manager dialog for set show/hide."""
@@ -130,22 +141,23 @@ class SetLauncher(LauncherBase):
             return
         super().focusOutEvent(event)
 
-    def _build_all_sets(self, state: Dict[str, dict]) -> List[Dict[str, str]]:
-        """Build full set list respecting hidden/order/group metadata."""
+    def _build_all_sets(self, state: Dict[str, dict], library: Dict[str, Dict[str, Any]]) -> List[Dict[str, str]]:
+        """Build full set list from explicit scene-local library entries."""
 
         records: List[Dict[str, str]] = []
-        for set_name in self._sets.list_scene_sets():
-            meta = state.get(set_name, {})
-            if bool(meta.get("hidden_in_launcher", False)):
+        for entry in self._sorted_library_entries(library):
+            set_name = str(entry.get("source_ref", ""))
+            if not set_name:
                 continue
-            group = str(meta.get("group", "Main"))
+            if bool(entry.get("hidden_in_launcher", False)):
+                continue
             records.append(
                 {
                     "id": set_name,
                     "name": self._elide_label(self._display_label(set_name)),
-                    "category_id": group,
-                    "color": str(meta.get("button_color", "#6B7280")),
-                    "display_order": int(meta.get("display_order", 1000)),
+                    "category_id": "Main",
+                    "color": str(entry.get("button_color", state.get(set_name, {}).get("button_color", "#6B7280"))),
+                    "display_order": int(entry.get("display_order", 1000)),
                     "tooltip": set_name,
                 }
             )
@@ -159,9 +171,14 @@ class SetLauncher(LauncherBase):
         )
         return records
 
-    def _build_related_sets(self, state: Dict[str, dict]) -> List[Dict[str, str]]:
+    def _build_related_sets(self, state: Dict[str, dict], library: Dict[str, Dict[str, Any]]) -> List[Dict[str, str]]:
         """Build contextual related sets (top N) for current selection."""
 
+        allowed_names = {
+            str(entry.get("source_ref", ""))
+            for entry in library.values()
+            if entry and not bool(entry.get("hidden_in_launcher", False))
+        }
         selection = self._sets.get_current_selection()
         require_all = len(selection) > 1
         related_names = self._sets.get_related_sets_for_selection(selection=selection, require_all=require_all)
@@ -170,6 +187,8 @@ class SetLauncher(LauncherBase):
 
         related_records: List[Dict[str, str]] = []
         for name in related_names[: self._RELATED_LIMIT]:
+            if name not in allowed_names:
+                continue
             meta = state.get(name, {})
             if bool(meta.get("hidden_in_launcher", False)):
                 continue
@@ -288,6 +307,10 @@ class SetLauncher(LauncherBase):
         state.setdefault(set_name, {})
         state[set_name]["hidden_in_launcher"] = bool(hidden)
         self._sets.save_scene_set_ui_state(state)
+        library = self._sets.load_scene_set_library()
+        entry_id = self._entry_id_for_source_ref(library, set_name)
+        if entry_id:
+            self._sets.update_set_library_entry(entry_id, {"hidden_in_launcher": bool(hidden)})
         self.refresh_from_scene()
         self._toast(f"{'Hidden' if hidden else 'Shown'} in launcher: {set_name}")
 
@@ -314,6 +337,10 @@ class SetLauncher(LauncherBase):
         state.setdefault(set_name, {})
         state[set_name]["button_color"] = color_value
         self._sets.save_scene_set_ui_state(state)
+        library = self._sets.load_scene_set_library()
+        entry_id = self._entry_id_for_source_ref(library, set_name)
+        if entry_id:
+            self._sets.update_set_library_entry(entry_id, {"button_color": color_value})
         self.refresh_from_scene()
         self._toast(f"Color updated: {set_name}")
 
@@ -332,7 +359,8 @@ class SetLauncher(LauncherBase):
             return
         self._last_selection = current
         state = self._sets.load_scene_set_ui_state()
-        self._related_widget.set_related_sets(self._build_related_sets(state))
+        library = self._sets.load_scene_set_library()
+        self._related_widget.set_related_sets(self._build_related_sets(state, library))
 
     def _start_selection_watch(self) -> None:
         if not self._watch_timer.isActive():
@@ -354,13 +382,14 @@ class SetLauncher(LauncherBase):
                 return candidate
             index += 1
 
-    def _choose_new_set_color(self, state: Dict[str, dict]) -> str:
+    def _choose_new_set_color(self, state: Dict[str, dict], library: Dict[str, Dict[str, Any]] | None = None) -> str:
         """Choose balanced color to reduce visible neighbor duplicates."""
 
         palette_values = [hex_color for _, hex_color in self._SET_COLORS]
         usage = Counter(str(meta.get("button_color", "")) for meta in state.values())
 
-        all_sets = self._build_all_sets(state)
+        active_library = library if library is not None else self._sets.load_scene_set_library()
+        all_sets = self._build_all_sets(state, active_library)
         recent_colors = [str(item.get("color", "")) for item in all_sets[-2:]]
 
         def score(color: str) -> Tuple[int, int]:
@@ -368,6 +397,53 @@ class SetLauncher(LauncherBase):
             return (usage.get(color, 0), repeat_penalty)
 
         return sorted(palette_values, key=score)[0]
+
+    def _open_reference_add_dialog(self) -> None:
+        """Open picker to import reference-approved (or all) reference sets."""
+
+        self._context_menu_active = True
+        dialog = ReferenceSetPickerDialog(registry=self._sets, parent=self)
+        accepted = dialog.exec_() == QtWidgets.QDialog.Accepted
+        self._context_menu_active = False
+        if not accepted:
+            return
+
+        selected_sets = dialog.selected_sets()
+        if not selected_sets:
+            self._toast("No reference sets selected")
+            return
+
+        state = self._sets.load_scene_set_ui_state()
+        added_count = 0
+        for set_name in selected_sets:
+            color = str(state.get(set_name, {}).get("button_color", self._choose_new_set_color(state)))
+            self._sets.register_set_library_entry(
+                source_ref=set_name,
+                source_kind="referenced_maya_set",
+                display_label=self._display_label(set_name),
+                color=color,
+                hidden_in_launcher=False,
+                is_referenced=True,
+            )
+            added_count += 1
+        self.refresh_from_scene()
+        self._toast(f"Added {added_count} reference set(s)")
+
+    def _sorted_library_entries(self, library: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+        return sorted(
+            [entry for entry in library.values() if isinstance(entry, dict)],
+            key=lambda entry: (
+                int(entry.get("display_order", 1000)),
+                str(entry.get("display_label", "")).lower(),
+                str(entry.get("source_ref", "")).lower(),
+            ),
+        )
+
+    def _entry_id_for_source_ref(self, library: Dict[str, Dict[str, Any]], source_ref: str) -> str | None:
+        for entry_id, entry in library.items():
+            if str(entry.get("source_ref", "")) == source_ref:
+                return str(entry_id)
+        return None
 
     def _display_label(self, full_set_name: str) -> str:
         """Return namespace-free display label while keeping full name internal."""
