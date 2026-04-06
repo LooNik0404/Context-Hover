@@ -48,6 +48,7 @@ class SetLauncher(LauncherBase):
         self._watch_timer.timeout.connect(self._refresh_related_if_selection_changed)
         self._context_menu_active = False
         self._interaction_lock_count = 0
+        self._layout_refresh_token = 0
 
         self._command_grid.button_clicked.connect(self._on_set_clicked)
         self._command_grid.button_context_requested.connect(self._open_set_context_menu)
@@ -62,9 +63,17 @@ class SetLauncher(LauncherBase):
         all_sets = self._build_all_sets(state, library)
         related = self._build_related_sets(state, library)
 
-        self.set_buttons(all_sets)
         self._related_widget.set_related_sets(related)
         self._last_selection = self._sets.get_current_selection()
+        self._layout_refresh_token += 1
+        token = self._layout_refresh_token
+
+        def _apply_all_sets() -> None:
+            if token != self._layout_refresh_token:
+                return
+            self.set_buttons(all_sets)
+
+        QtCore.QTimer.singleShot(0, _apply_all_sets)
 
     def on_add_requested(self) -> None:
         """LMB plus: create a local set from selection and register it."""
@@ -388,10 +397,7 @@ class SetLauncher(LauncherBase):
         current = self._sets.get_current_selection()
         if current == self._last_selection:
             return
-        self._last_selection = current
-        state = self._sets.load_scene_set_ui_state()
-        library = self._sets.load_scene_set_library()
-        self._related_widget.set_related_sets(self._build_related_sets(state, library))
+        self.refresh_from_scene()
 
     def _start_selection_watch(self) -> None:
         if not self._watch_timer.isActive():
