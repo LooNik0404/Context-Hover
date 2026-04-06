@@ -111,6 +111,11 @@ class LauncherBase(QtWidgets.QWidget):
 
         self._command_grid.set_columns(columns)
 
+    def set_button_display_mode(self, mode: str) -> None:
+        """Set command grid display mode (grid or list)."""
+
+        self._command_grid.set_display_mode(mode)
+
     def show_at_cursor(self) -> None:
         """Show launcher near cursor and focus it."""
 
@@ -164,11 +169,9 @@ class LauncherBase(QtWidgets.QWidget):
         super().keyPressEvent(event)
 
     def focusOutEvent(self, event: QtGui.QFocusEvent) -> None:  # noqa: N802
-        """Auto-close when unpinned and focus is lost."""
+        """Do not auto-close on transient focus changes in hold-to-show workflow."""
 
         super().focusOutEvent(event)
-        if not self._is_pinned:
-            self.close()
 
     def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
         """Allow dragging launcher via top utility bar when pinned."""

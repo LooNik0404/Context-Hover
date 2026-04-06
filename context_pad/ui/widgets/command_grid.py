@@ -23,6 +23,7 @@ class CommandGrid(QtWidgets.QWidget):
         self._visible_buttons: List[Dict[str, str]] = []
         self._visible_button_ids: List[str] = []
         self._columns = max(1, columns)
+        self._display_mode = "grid"
 
         self._layout = QtWidgets.QGridLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
@@ -36,6 +37,13 @@ class CommandGrid(QtWidgets.QWidget):
 
         self._columns = max(1, columns)
         self._rebuild_grid(self._buttons)
+
+    def set_display_mode(self, mode: str) -> None:
+        """Set visual display mode: grid (default) or list (compact rows)."""
+
+        normalized = str(mode or "grid").strip().lower()
+        self._display_mode = "list" if normalized == "list" else "grid"
+        self._rebuild_grid(self._visible_buttons or self._buttons)
 
     def set_buttons(self, buttons: List[Dict[str, str]], rebuild: bool = True) -> None:
         """Populate grid from button records."""
@@ -103,9 +111,11 @@ class CommandGrid(QtWidgets.QWidget):
 
             background = QtGui.QColor(item_data.get("color", "#4A89DC"))
             foreground = self._contrast_color(background)
-            button.setStyleSheet(
-                f"background-color: {background.name()}; color: {foreground.name()};"
-            )
+            base_style = f"background-color: {background.name()}; color: {foreground.name()};"
+            if self._display_mode == "list":
+                button.setStyleSheet(f"{base_style} text-align: left; padding-left: 8px; padding-right: 4px;")
+            else:
+                button.setStyleSheet(base_style)
 
             button.clicked.connect(lambda _=False, data=item_data: self.button_clicked.emit(data))
             button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -122,8 +132,9 @@ class CommandGrid(QtWidgets.QWidget):
             button_width = self._span_pixel_width(col_span, module_width)
             button.setMinimumWidth(button_width)
             button.setMaximumWidth(button_width)
-            button.setMinimumHeight(self._button_height)
-            button.setMaximumHeight(self._button_height)
+            row_height = 26 if self._display_mode == "list" else self._button_height
+            button.setMinimumHeight(row_height)
+            button.setMaximumHeight(row_height)
             button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
             button.setText(self._elide_button_text(button_name, button.fontMetrics(), button_width - 14))
 

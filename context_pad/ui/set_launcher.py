@@ -33,6 +33,7 @@ class SetLauncher(LauncherBase):
         super().__init__(parent=parent)
         self.setWindowTitle("Context Pad - Sets")
         self.set_button_columns(1)
+        self.set_button_display_mode("list")
 
         self._sets = SetRegistry()
         self._related_widget = RelatedSetsList()
