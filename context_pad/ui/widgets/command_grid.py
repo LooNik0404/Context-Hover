@@ -176,7 +176,9 @@ class CommandGrid(QtWidgets.QWidget):
     def _module_pixel_width(self) -> int:
         spacing = max(0, int(self._layout.horizontalSpacing()))
         margins = self._layout.contentsMargins()
-        available = max(1, self.width() - margins.left() - margins.right())
+        viewport = self.parentWidget()
+        viewport_width = viewport.width() if viewport is not None else self.width()
+        available = max(1, int(viewport_width) - margins.left() - margins.right())
         total_spacing = spacing * max(0, self._columns - 1)
         module = (available - total_spacing) // max(1, self._columns)
         return max(28, int(module))
