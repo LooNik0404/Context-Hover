@@ -20,6 +20,7 @@ class CommandGrid(QtWidgets.QWidget):
         self.setAutoFillBackground(False)
         self.setStyleSheet("background: transparent;")
         self._buttons: List[Dict[str, str]] = []
+        self._visible_buttons: List[Dict[str, str]] = []
         self._visible_button_ids: List[str] = []
         self._columns = max(1, columns)
 
@@ -28,7 +29,6 @@ class CommandGrid(QtWidgets.QWidget):
         self._layout.setHorizontalSpacing(6)
         self._layout.setVerticalSpacing(4)
         self._layout.setAlignment(QtCore.Qt.AlignTop)
-        self._module_width = 82
         self._button_height = 34
 
     def set_columns(self, columns: int) -> None:
@@ -68,6 +68,7 @@ class CommandGrid(QtWidgets.QWidget):
         ]
         if visible_fingerprint == self._visible_button_ids:
             return
+        self._visible_buttons = list(buttons)
         self._visible_button_ids = visible_fingerprint
         self._rebuild_grid(buttons)
 
@@ -82,6 +83,7 @@ class CommandGrid(QtWidgets.QWidget):
 
         row = 0
         col = 0
+        module_width = self._module_pixel_width()
         for item_data in buttons:
             item_type = str(item_data.get("item_type", "button"))
             if item_type == "separator":
@@ -117,7 +119,7 @@ class CommandGrid(QtWidgets.QWidget):
                 row += 1
                 col = 0
 
-            button_width = self._span_pixel_width(col_span)
+            button_width = self._span_pixel_width(col_span, module_width)
             button.setMinimumWidth(button_width)
             button.setMaximumWidth(button_width)
             button.setMinimumHeight(self._button_height)
@@ -160,12 +162,27 @@ class CommandGrid(QtWidgets.QWidget):
         layout.addWidget(line_right, 1)
         return container
 
-    def _span_pixel_width(self, span: int) -> int:
+    def _module_pixel_width(self) -> int:
+        spacing = max(0, int(self._layout.horizontalSpacing()))
+        margins = self._layout.contentsMargins()
+        available = max(1, self.width() - margins.left() - margins.right())
+        total_spacing = spacing * max(0, self._columns - 1)
+        module = (available - total_spacing) // max(1, self._columns)
+        return max(28, int(module))
+
+    def _span_pixel_width(self, span: int, module_width: int) -> int:
         spacing = self._layout.horizontalSpacing()
-        return (self._module_width * span) + (spacing * max(0, span - 1))
+        return (module_width * span) + (spacing * max(0, span - 1))
 
     def _elide_button_text(self, text: str, metrics: QtGui.QFontMetrics, max_width: int) -> str:
         return metrics.elidedText(text, QtCore.Qt.ElideRight, max(12, int(max_width)))
+
+    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:  # noqa: N802
+        """Reflow modular widths against real viewport/content width."""
+
+        super().resizeEvent(event)
+        if self._visible_buttons:
+            self._rebuild_grid(self._visible_buttons)
 
     def _contrast_color(self, color: QtGui.QColor) -> QtGui.QColor:
         """Return black/white text color based on luminance contrast."""
