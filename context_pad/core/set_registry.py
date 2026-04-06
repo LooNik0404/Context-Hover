@@ -75,6 +75,11 @@ class SetRegistry:
 
         return maya_sets.is_referenced_set(name)
 
+    def set_exists(self, name: str) -> bool:
+        """Return True when set exists in current Maya scene."""
+
+        return maya_sets.set_exists(name)
+
     def get_related_sets_for_selection(
         self,
         selection: Optional[List[str]] = None,
@@ -148,3 +153,8 @@ class SetRegistry:
         """Update an existing scene-local set library entry."""
 
         return maya_scene_meta.update_set_library_entry(entry_id, updates)
+
+    def delete_set_library_entry(self, entry_id: str) -> bool:
+        """Delete a scene-local set library entry."""
+
+        return maya_scene_meta.delete_set_library_entry(entry_id)

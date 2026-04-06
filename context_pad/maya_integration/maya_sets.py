@@ -225,6 +225,17 @@ def get_set_size(name: str) -> int:
     return len(members) if members is not None else 0
 
 
+def set_exists(name: str) -> bool:
+    """Return True when a set node exists in scene."""
+
+    if cmds is None:
+        return False
+    try:
+        return bool(cmds.objExists(name))
+    except Exception:
+        return False
+
+
 def is_referenced_set(name: str) -> bool:
     """Return True if the set node is referenced from an external file."""
 

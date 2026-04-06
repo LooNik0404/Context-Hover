@@ -89,6 +89,8 @@ def hide_set_launcher() -> None:
         return
     if _SET_LAUNCHER.is_pinned():
         return
+    if hasattr(_SET_LAUNCHER, "is_interaction_locked") and _SET_LAUNCHER.is_interaction_locked():
+        return
     _SET_LAUNCHER.close()
 
 def launch_script_overlay() -> ScriptLauncher:

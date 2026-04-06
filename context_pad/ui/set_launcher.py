@@ -46,6 +46,7 @@ class SetLauncher(LauncherBase):
         self._watch_timer.setInterval(300)
         self._watch_timer.timeout.connect(self._refresh_related_if_selection_changed)
         self._context_menu_active = False
+        self._interaction_lock_count = 0
 
         self._command_grid.button_clicked.connect(self._on_set_clicked)
         self._command_grid.button_context_requested.connect(self._open_set_context_menu)
@@ -73,30 +74,44 @@ class SetLauncher(LauncherBase):
             return
 
         new_name = self._sets.sanitize_set_name(self._suggest_set_name())
-        if self._sets.create_set_from_selection(new_name):
-            color = self._choose_new_set_color(state=self._sets.load_scene_set_ui_state())
-            self._sets.register_set_library_entry(
-                source_ref=new_name,
-                source_kind="local_maya_set",
-                display_label=self._display_label(new_name),
-                color=color,
-                hidden_in_launcher=False,
-                is_referenced=False,
-            )
-            self.refresh_from_scene()
-            self._toast(f"Created set: {new_name}")
-        else:
+        if not self._sets.create_set_from_selection(new_name):
             self._toast("Could not create set")
+            return
+
+        if not self._sets.set_exists(new_name):
+            self._log_warning(f"Created set was not found after creation: '{new_name}'")
+            self._toast("Set creation failed validation")
+            return
+
+        member_count = self._sets.get_set_size(new_name)
+        if member_count <= 0:
+            self._log_warning(f"Refusing to register empty set '{new_name}'")
+            self._toast("Set creation produced no members")
+            return
+
+        color = self._choose_new_set_color(state=self._sets.load_scene_set_ui_state())
+        self._sets.register_set_library_entry(
+            source_ref=new_name,
+            source_kind="local_maya_set",
+            display_label=self._display_label(new_name),
+            color=color,
+            hidden_in_launcher=False,
+            is_referenced=False,
+        )
+        self.refresh_from_scene()
+        self._toast(f"Created set: {new_name}")
 
     def on_add_context_requested(self, global_pos: object) -> None:
         """RMB plus: show exactly two add actions."""
 
-        self._context_menu_active = True
-        menu = QtWidgets.QMenu(self)
-        action_create = menu.addAction("Create Set from Selection")
-        action_add_ref = menu.addAction("Add Sets from Reference...")
-        selected = menu.exec_(global_pos)
-        self._context_menu_active = False
+        self._enter_interaction()
+        try:
+            menu = QtWidgets.QMenu(self)
+            action_create = menu.addAction("Create Set from Selection")
+            action_add_ref = menu.addAction("Add Sets from Reference...")
+            selected = menu.exec_(global_pos)
+        finally:
+            self._exit_interaction()
 
         if selected is action_create:
             self.on_add_requested()
@@ -106,8 +121,12 @@ class SetLauncher(LauncherBase):
     def on_manager_requested(self) -> None:
         """Open compact visibility manager dialog for set show/hide."""
 
-        dialog = SetVisibilityDialog(registry=self._sets, parent=self)
-        dialog.exec_()
+        self._enter_interaction()
+        try:
+            dialog = SetVisibilityDialog(registry=self._sets, parent=self)
+            dialog.exec_()
+        finally:
+            self._exit_interaction()
         self.refresh_from_scene()
 
     def set_pinned(self, state: bool) -> None:
@@ -136,7 +155,7 @@ class SetLauncher(LauncherBase):
     def focusOutEvent(self, event) -> None:  # noqa: N802
         """Keep launcher open while RMB menu/dialog interactions are active."""
 
-        if self._context_menu_active:
+        if self.is_interaction_locked():
             event.accept()
             return
         super().focusOutEvent(event)
@@ -227,16 +246,15 @@ class SetLauncher(LauncherBase):
         if not set_name:
             return
 
-        self._context_menu_active = True
-        menu = QtWidgets.QMenu(self)
-        action_rename = menu.addAction("Rename")
-        action_hide = menu.addAction("Hide from Launcher")
-        action_delete = menu.addAction("Delete")
-        action_color = menu.addAction("Change Color")
-        action_update = menu.addAction("Update from Selection")
-
-        selected = menu.exec_(global_pos)
+        self._enter_interaction()
         try:
+            menu = QtWidgets.QMenu(self)
+            action_rename = menu.addAction("Rename")
+            action_hide = menu.addAction("Hide from Launcher")
+            action_delete = menu.addAction("Delete")
+            action_color = menu.addAction("Change Color")
+            action_update = menu.addAction("Update from Selection")
+            selected = menu.exec_(global_pos)
             if selected is action_rename:
                 self._rename_set(set_name)
             elif selected is action_hide:
@@ -249,13 +267,15 @@ class SetLauncher(LauncherBase):
                 self._update_from_selection(set_name)
         except Exception as exc:
             self._log_warning(f"Set action failed for '{set_name}': {exc}")
-
-        self._context_menu_active = False
+        finally:
+            self._exit_interaction()
 
     def _rename_set(self, old_name: str) -> None:
-        self._context_menu_active = True
-        new_name, ok = QtWidgets.QInputDialog.getText(self, "Rename Set", "New set name", text=old_name)
-        self._context_menu_active = False
+        self._enter_interaction()
+        try:
+            new_name, ok = QtWidgets.QInputDialog.getText(self, "Rename Set", "New set name", text=old_name)
+        finally:
+            self._exit_interaction()
         if not ok or not new_name.strip() or new_name.strip() == old_name:
             return
 
@@ -267,16 +287,28 @@ class SetLauncher(LauncherBase):
         if clean_name == old_name:
             self._toast("Set name unchanged")
             return
-        state_before = self._sets.load_scene_set_ui_state()
-        cached_meta = dict(state_before.get(old_name, {}))
-
         if self._sets.rename_set(old_name, clean_name):
-            state_after = self._sets.load_scene_set_ui_state()
-            state_after.pop(old_name, None)
-            if cached_meta:
-                state_after[clean_name] = cached_meta
-            self._sets.save_scene_set_ui_state(state_after)
-            self._sets.refresh_scene_set_ui_state()
+            library = self._sets.load_scene_set_library()
+            entry_id = self._entry_id_for_source_ref(library, old_name)
+            if entry_id:
+                self._sets.update_set_library_entry(
+                    entry_id,
+                    {
+                        "source_ref": clean_name,
+                        "display_label": self._display_label(clean_name),
+                        "is_referenced": False,
+                    },
+                )
+            else:
+                # Fallback safety: if entry missing, register renamed local set.
+                self._sets.register_set_library_entry(
+                    source_ref=clean_name,
+                    source_kind="local_maya_set",
+                    display_label=self._display_label(clean_name),
+                    color=self._choose_new_set_color(state=self._sets.load_scene_set_ui_state()),
+                    hidden_in_launcher=False,
+                    is_referenced=False,
+                )
             self.refresh_from_scene()
             self._toast(f"Renamed: {clean_name}")
         else:
@@ -287,9 +319,11 @@ class SetLauncher(LauncherBase):
             self._toast("Referenced sets cannot be deleted")
             return
 
-        self._context_menu_active = True
-        confirm = QtWidgets.QMessageBox.question(self, "Delete Set", f"Delete set '{set_name}'?")
-        self._context_menu_active = False
+        self._enter_interaction()
+        try:
+            confirm = QtWidgets.QMessageBox.question(self, "Delete Set", f"Delete set '{set_name}'?")
+        finally:
+            self._exit_interaction()
         if confirm != QtWidgets.QMessageBox.Yes:
             return
 
@@ -303,10 +337,6 @@ class SetLauncher(LauncherBase):
     def _set_hidden_in_launcher(self, set_name: str, hidden: bool) -> None:
         """Store reversible launcher visibility for full set name key."""
 
-        state = self._sets.refresh_scene_set_ui_state()
-        state.setdefault(set_name, {})
-        state[set_name]["hidden_in_launcher"] = bool(hidden)
-        self._sets.save_scene_set_ui_state(state)
         library = self._sets.load_scene_set_library()
         entry_id = self._entry_id_for_source_ref(library, set_name)
         if entry_id:
@@ -315,17 +345,19 @@ class SetLauncher(LauncherBase):
         self._toast(f"{'Hidden' if hidden else 'Shown'} in launcher: {set_name}")
 
     def _change_set_color(self, set_name: str) -> None:
-        self._context_menu_active = True
-        named_choices = [name for name, _ in self._SET_COLORS]
-        selected_label, ok = QtWidgets.QInputDialog.getItem(
-            self,
-            "Set Color",
-            "Choose color",
-            named_choices,
-            0,
-            False,
-        )
-        self._context_menu_active = False
+        self._enter_interaction()
+        try:
+            named_choices = [name for name, _ in self._SET_COLORS]
+            selected_label, ok = QtWidgets.QInputDialog.getItem(
+                self,
+                "Set Color",
+                "Choose color",
+                named_choices,
+                0,
+                False,
+            )
+        finally:
+            self._exit_interaction()
         if not ok or not selected_label:
             return
 
@@ -333,10 +365,6 @@ class SetLauncher(LauncherBase):
         if not color_value:
             return
 
-        state = self._sets.refresh_scene_set_ui_state()
-        state.setdefault(set_name, {})
-        state[set_name]["button_color"] = color_value
-        self._sets.save_scene_set_ui_state(state)
         library = self._sets.load_scene_set_library()
         entry_id = self._entry_id_for_source_ref(library, set_name)
         if entry_id:
@@ -401,10 +429,12 @@ class SetLauncher(LauncherBase):
     def _open_reference_add_dialog(self) -> None:
         """Open picker to import reference-approved (or all) reference sets."""
 
-        self._context_menu_active = True
-        dialog = ReferenceSetPickerDialog(registry=self._sets, parent=self)
-        accepted = dialog.exec_() == QtWidgets.QDialog.Accepted
-        self._context_menu_active = False
+        self._enter_interaction()
+        try:
+            dialog = ReferenceSetPickerDialog(registry=self._sets, parent=self)
+            accepted = dialog.exec_() == QtWidgets.QDialog.Accepted
+        finally:
+            self._exit_interaction()
         if not accepted:
             return
 
@@ -444,6 +474,19 @@ class SetLauncher(LauncherBase):
             if str(entry.get("source_ref", "")) == source_ref:
                 return str(entry_id)
         return None
+
+    def is_interaction_locked(self) -> bool:
+        """Return True while set UI menus/dialogs are active."""
+
+        return self._interaction_lock_count > 0
+
+    def _enter_interaction(self) -> None:
+        self._context_menu_active = True
+        self._interaction_lock_count += 1
+
+    def _exit_interaction(self) -> None:
+        self._interaction_lock_count = max(0, self._interaction_lock_count - 1)
+        self._context_menu_active = self._interaction_lock_count > 0
 
     def _display_label(self, full_set_name: str) -> str:
         """Return namespace-free display label while keeping full name internal."""
