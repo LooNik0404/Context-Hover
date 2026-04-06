@@ -53,7 +53,7 @@ class ScriptLauncher(LauncherBase):
                             "type": item["action_type"],
                             "source": item["source"],
                             "label": item["label"],
-                            "tooltip": item.get("tooltip", ""),
+                            "tooltip": item.get("tooltip", "") or item["label"],
                             "item_type": item.get("item_type", "button"),
                             "button_size": item.get("button_size", "normal"),
                             "code": item["source"] if item["action_type"].endswith("inline") else "",

@@ -18,6 +18,7 @@ class ManagerWindow(QtWidgets.QMainWindow):
         self._app_state = app_state
         self._editor = ScriptLibraryEditor()
         self._active_button_id: Optional[str] = None
+        self._is_syncing_properties = False
 
         self.setWindowTitle("Context Pad Library Manager")
         self.resize(1020, 720)
@@ -29,10 +30,13 @@ class ManagerWindow(QtWidgets.QMainWindow):
         self._tabs = QtWidgets.QTabWidget()
         self._tabs.addTab(self._build_button_setup_tab(), "Button Setup")
         self._tabs.addTab(self._build_code_editor_tab(), "Code Editor")
+        self._tabs.currentChanged.connect(self._update_shared_actions_state)
 
         self._status = QtWidgets.QLabel("Ready")
+        shared_actions = self._build_shared_action_bar()
 
         root.addWidget(self._tabs)
+        root.addWidget(shared_actions)
         root.addWidget(self._status)
 
         self._refresh_all()
@@ -58,7 +62,6 @@ class ManagerWindow(QtWidgets.QMainWindow):
         toolbar = QtWidgets.QHBoxLayout()
         toolbar.setSpacing(6)
         btn_add = QtWidgets.QPushButton("Add")
-        btn_add_separator = QtWidgets.QPushButton("Add Separator")
         btn_rename = QtWidgets.QPushButton("Rename")
         btn_delete = QtWidgets.QPushButton("Delete")
         btn_up = QtWidgets.QPushButton("Move Up")
@@ -114,14 +117,15 @@ class ManagerWindow(QtWidgets.QMainWindow):
         self._prop_size = QtWidgets.QComboBox()
         self._prop_size.addItems(["Normal", "Small"])
 
-        btn_apply = QtWidgets.QPushButton("Apply Properties")
-        btn_apply.clicked.connect(self._apply_properties)
+        self._prop_name.editingFinished.connect(self._on_property_edited)
+        self._prop_category.currentIndexChanged.connect(self._on_property_edited)
+        self._prop_size.currentIndexChanged.connect(self._on_property_edited)
+        self._prop_color.color_changed.connect(self._on_property_edited)
 
         form.addRow("Button Name", self._prop_name)
         form.addRow("Category", self._prop_category)
         form.addRow("Size", self._prop_size)
         form.addRow("Color", self._prop_color)
-        form.addRow(btn_apply)
         return panel
 
     def _build_code_editor_tab(self) -> QtWidgets.QWidget:
@@ -155,26 +159,34 @@ class ManagerWindow(QtWidgets.QMainWindow):
         tooltip_row.addRow("Tooltip", self._code_tooltip)
         layout.addLayout(tooltip_row)
 
-        action_row = QtWidgets.QHBoxLayout()
-        btn_apply = QtWidgets.QPushButton("Apply")
-        btn_save = QtWidgets.QPushButton("Save Library")
-        btn_reload = QtWidgets.QPushButton("Reload Library")
-        btn_apply.clicked.connect(self._apply_button_changes)
-        btn_save.clicked.connect(self._save_library)
-        btn_reload.clicked.connect(self._reload_library)
-
-        action_row.addWidget(btn_apply)
-        action_row.addStretch(1)
-        action_row.addWidget(btn_save)
-        action_row.addWidget(btn_reload)
-        layout.addLayout(action_row)
-
         hint = QtWidgets.QLabel(
             "Scene set creation and set maintenance stay in the Set Launcher hover UI."
         )
         hint.setStyleSheet("color: rgba(230,230,230,170);")
         layout.addWidget(hint)
         return tab
+
+    def _build_shared_action_bar(self) -> QtWidgets.QWidget:
+        """Shared manager action bar visible from both tabs."""
+
+        bar = QtWidgets.QFrame()
+        layout = QtWidgets.QHBoxLayout(bar)
+        layout.setContentsMargins(0, 4, 0, 2)
+        layout.setSpacing(6)
+
+        self._btn_apply_code = QtWidgets.QPushButton("Apply Code")
+        self._btn_save_library = QtWidgets.QPushButton("Save Library")
+        self._btn_reload_library = QtWidgets.QPushButton("Reload Library")
+
+        self._btn_apply_code.clicked.connect(self._apply_button_changes)
+        self._btn_save_library.clicked.connect(self._save_library)
+        self._btn_reload_library.clicked.connect(self._reload_library)
+
+        layout.addWidget(self._btn_apply_code)
+        layout.addStretch(1)
+        layout.addWidget(self._btn_save_library)
+        layout.addWidget(self._btn_reload_library)
+        return bar
 
 
     def open_button_setup_tab(self) -> None:
@@ -197,6 +209,7 @@ class ManagerWindow(QtWidgets.QMainWindow):
         self._refresh_category_dropdown()
         self._refresh_buttons()
         self._sync_selection_views()
+        self._update_shared_actions_state()
 
     def _refresh_categories(self) -> None:
         selected = self._current_category_id()
@@ -263,6 +276,7 @@ class ManagerWindow(QtWidgets.QMainWindow):
         return category.get("label", "Unknown") if category else "Unknown"
 
     def _sync_selection_views(self) -> None:
+        self._is_syncing_properties = True
         button = self._selected_button()
         has_selection = button is not None
         is_separator = bool(button and str(button.get("item_type", "button")) == "separator")
@@ -283,6 +297,8 @@ class ManagerWindow(QtWidgets.QMainWindow):
             self._selection_swatch.setStyleSheet(
                 "background:#6B7280; border:1px solid rgba(255,255,255,70); border-radius:3px;"
             )
+            self._is_syncing_properties = False
+            self._update_shared_actions_state()
             return
 
         label = button.get("label", "Unnamed")
@@ -306,6 +322,8 @@ class ManagerWindow(QtWidgets.QMainWindow):
             self._code_language.setCurrentText("Python")
             self._code_editor.setPlainText("")
             self._code_tooltip.setText("")
+            self._is_syncing_properties = False
+            self._update_shared_actions_state()
             return
 
         self._code_language.setCurrentText("Python" if action_type.startswith("python") else "MEL")
@@ -326,6 +344,21 @@ class ManagerWindow(QtWidgets.QMainWindow):
 
         self._code_editor.setPlainText(str(source_value))
         self._code_tooltip.setText(button.get("tooltip", ""))
+        self._is_syncing_properties = False
+        self._update_shared_actions_state()
+
+    def _on_property_edited(self, *_: Any) -> None:
+        """Auto-apply basic setup properties when changed by user."""
+
+        if self._is_syncing_properties:
+            return
+        self._apply_properties()
+
+    def _update_shared_actions_state(self) -> None:
+        button = self._selected_button()
+        is_code_tab = self._tabs.currentIndex() == 1
+        is_button = bool(button and str(button.get("item_type", "button")) != "separator")
+        self._btn_apply_code.setEnabled(bool(is_code_tab and is_button))
 
     def _on_category_changed(self, *_: Any) -> None:
         self._refresh_buttons()
@@ -485,14 +518,18 @@ class ManagerWindow(QtWidgets.QMainWindow):
 
         category_id = str(self._prop_category.currentData() or button.get("category_id", ""))
         item_type = str(button.get("item_type", "button"))
-        size_mode = "small" if self._prop_size.currentText() == "Small" else "normal"
-        payload = {
-            "label": self._prop_name.text().strip() or button.get("label", "Button"),
-            "category_id": category_id,
-            "color": self._prop_color.color(),
-            "button_size": size_mode,
-            "item_type": item_type,
-        }
+        payload = {"label": self._prop_name.text().strip() or button.get("label", "Button"), "category_id": category_id}
+        if item_type == "separator":
+            payload["item_type"] = "separator"
+            payload["action_type"] = "separator"
+            payload["button_size"] = "normal"
+            payload["source"] = ""
+            payload["tooltip"] = ""
+        else:
+            size_mode = "small" if self._prop_size.currentText() == "Small" else "normal"
+            payload["item_type"] = "button"
+            payload["color"] = self._prop_color.color()
+            payload["button_size"] = size_mode
         self._editor.update_button(button["id"], payload)
         self._refresh_buttons()
         self._sync_selection_views()

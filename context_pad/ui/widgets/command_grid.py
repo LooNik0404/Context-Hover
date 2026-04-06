@@ -26,8 +26,10 @@ class CommandGrid(QtWidgets.QWidget):
         self._layout = QtWidgets.QGridLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setHorizontalSpacing(6)
-        self._layout.setVerticalSpacing(6)
+        self._layout.setVerticalSpacing(4)
         self._layout.setAlignment(QtCore.Qt.AlignTop)
+        self._module_width = 82
+        self._button_height = 34
 
     def set_columns(self, columns: int) -> None:
         """Set number of columns used for button layout."""
@@ -91,8 +93,8 @@ class CommandGrid(QtWidgets.QWidget):
                 row += 1
                 continue
 
-            button_name = item_data.get("name", "Button")
-            button = QtWidgets.QPushButton(button_name)
+            button_name = str(item_data.get("name", "Button"))
+            button = QtWidgets.QPushButton()
             button.setObjectName("ContextPadCommandButton")
             tooltip = str(item_data.get("tooltip", "")).strip()
             button.setToolTip(tooltip or str(button_name))
@@ -115,6 +117,14 @@ class CommandGrid(QtWidgets.QWidget):
                 row += 1
                 col = 0
 
+            button_width = self._span_pixel_width(col_span)
+            button.setMinimumWidth(button_width)
+            button.setMaximumWidth(button_width)
+            button.setMinimumHeight(self._button_height)
+            button.setMaximumHeight(self._button_height)
+            button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+            button.setText(self._elide_button_text(button_name, button.fontMetrics(), button_width - 14))
+
             self._layout.addWidget(button, row, col, 1, col_span)
             col += col_span
             if col >= self._columns:
@@ -128,25 +138,34 @@ class CommandGrid(QtWidgets.QWidget):
 
         container = QtWidgets.QWidget(self)
         layout = QtWidgets.QHBoxLayout(container)
-        layout.setContentsMargins(2, 4, 2, 4)
-        layout.setSpacing(6)
+        layout.setContentsMargins(2, 1, 2, 1)
+        layout.setSpacing(4)
+        container.setMinimumHeight(20)
+        container.setMaximumHeight(20)
 
         line_left = QtWidgets.QFrame(container)
         line_left.setFrameShape(QtWidgets.QFrame.HLine)
-        line_left.setStyleSheet("color: rgba(220,220,220,45);")
+        line_left.setStyleSheet("color: rgba(220,220,220,35);")
         layout.addWidget(line_left, 1)
 
         label_text = str(item_data.get("name", "")).strip()
         if label_text:
             label = QtWidgets.QLabel(label_text, container)
-            label.setStyleSheet("color: rgba(220,220,220,110); font-size: 10px;")
+            label.setStyleSheet("color: rgba(220,220,220,100); font-size: 9px;")
             layout.addWidget(label, 0)
 
         line_right = QtWidgets.QFrame(container)
         line_right.setFrameShape(QtWidgets.QFrame.HLine)
-        line_right.setStyleSheet("color: rgba(220,220,220,45);")
+        line_right.setStyleSheet("color: rgba(220,220,220,35);")
         layout.addWidget(line_right, 1)
         return container
+
+    def _span_pixel_width(self, span: int) -> int:
+        spacing = self._layout.horizontalSpacing()
+        return (self._module_width * span) + (spacing * max(0, span - 1))
+
+    def _elide_button_text(self, text: str, metrics: QtGui.QFontMetrics, max_width: int) -> str:
+        return metrics.elidedText(text, QtCore.Qt.ElideRight, max(12, int(max_width)))
 
     def _contrast_color(self, color: QtGui.QColor) -> QtGui.QColor:
         """Return black/white text color based on luminance contrast."""
