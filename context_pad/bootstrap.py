@@ -19,6 +19,8 @@ except Exception:  # pragma: no cover - outside Maya
 _MANAGER_WINDOW: Optional[ManagerWindow] = None
 _SCRIPT_LAUNCHER: Optional[ScriptLauncher] = None
 _SET_LAUNCHER: Optional[SetLauncher] = None
+_SCRIPT_HOLD_ACTIVE: bool = False
+_SET_HOLD_ACTIVE: bool = False
 
 
 def launch_context_pad() -> ManagerWindow:
@@ -42,9 +44,15 @@ def show_manager_window() -> ManagerWindow:
 def show_script_launcher() -> ScriptLauncher:
     """Show the singleton script launcher near the cursor."""
 
-    global _SCRIPT_LAUNCHER
+    global _SCRIPT_LAUNCHER, _SCRIPT_HOLD_ACTIVE
+    if _SCRIPT_HOLD_ACTIVE and _SCRIPT_LAUNCHER is not None and _is_alive(_SCRIPT_LAUNCHER) and _SCRIPT_LAUNCHER.isVisible():
+        return _SCRIPT_LAUNCHER
+    if _SCRIPT_HOLD_ACTIVE and (_SCRIPT_LAUNCHER is None or not _is_alive(_SCRIPT_LAUNCHER) or not _SCRIPT_LAUNCHER.isVisible()):
+        _SCRIPT_HOLD_ACTIVE = False
+
     if _SCRIPT_LAUNCHER is None or not _is_alive(_SCRIPT_LAUNCHER):
         _SCRIPT_LAUNCHER = ScriptLauncher(parent=maya_main_window())
+    _SCRIPT_HOLD_ACTIVE = True
     _SCRIPT_LAUNCHER.show_at_cursor()
     return _SCRIPT_LAUNCHER
 
@@ -61,9 +69,15 @@ def refresh_script_launcher() -> None:
 def show_set_launcher() -> SetLauncher:
     """Show the singleton set launcher near the cursor."""
 
-    global _SET_LAUNCHER
+    global _SET_LAUNCHER, _SET_HOLD_ACTIVE
+    if _SET_HOLD_ACTIVE and _SET_LAUNCHER is not None and _is_alive(_SET_LAUNCHER) and _SET_LAUNCHER.isVisible():
+        return _SET_LAUNCHER
+    if _SET_HOLD_ACTIVE and (_SET_LAUNCHER is None or not _is_alive(_SET_LAUNCHER) or not _SET_LAUNCHER.isVisible()):
+        _SET_HOLD_ACTIVE = False
+
     if _SET_LAUNCHER is None or not _is_alive(_SET_LAUNCHER):
         _SET_LAUNCHER = SetLauncher(parent=maya_main_window())
+    _SET_HOLD_ACTIVE = True
     _SET_LAUNCHER.show_at_cursor()
     return _SET_LAUNCHER
 
@@ -73,7 +87,8 @@ def show_set_launcher() -> SetLauncher:
 def hide_script_launcher() -> None:
     """Hide/close script launcher unless pinned."""
 
-    global _SCRIPT_LAUNCHER
+    global _SCRIPT_LAUNCHER, _SCRIPT_HOLD_ACTIVE
+    _SCRIPT_HOLD_ACTIVE = False
     if _SCRIPT_LAUNCHER is None or not _is_alive(_SCRIPT_LAUNCHER):
         return
     if _SCRIPT_LAUNCHER.is_pinned():
@@ -84,7 +99,8 @@ def hide_script_launcher() -> None:
 def hide_set_launcher() -> None:
     """Hide/close set launcher unless pinned."""
 
-    global _SET_LAUNCHER
+    global _SET_LAUNCHER, _SET_HOLD_ACTIVE
+    _SET_HOLD_ACTIVE = False
     if _SET_LAUNCHER is None or not _is_alive(_SET_LAUNCHER):
         return
     if _SET_LAUNCHER.is_pinned():
