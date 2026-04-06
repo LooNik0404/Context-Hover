@@ -8,31 +8,32 @@ def launcher_stylesheet() -> str:
 
     return """
     QWidget#ContextPadBody {
-        background-color: rgba(24, 25, 27, 208);
-        border: 1px solid rgba(255, 255, 255, 22);
+        background-color: rgba(20, 22, 24, 214);
+        border: 1px solid rgba(255, 255, 255, 20);
         border-radius: 12px;
     }
     QLabel#ContextPadLeftLabel {
-        color: rgba(220, 223, 228, 180);
+        color: rgba(205, 210, 218, 170);
         font-size: 9px;
         font-weight: 600;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.3px;
         padding-left: 2px;
     }
     QListWidget#ContextPadCategoryList {
         background: transparent;
         border: none;
-        color: rgb(220, 223, 228);
+        color: rgb(214, 218, 224);
         outline: none;
     }
     QListWidget#ContextPadCategoryList::item {
-        padding: 5px 6px;
+        min-height: 24px;
+        padding: 2px 6px;
         margin: 1px 0px;
         border-radius: 6px;
     }
     QListWidget#ContextPadCategoryList::item:selected {
-        background: rgba(130, 160, 205, 75);
-        color: rgb(240, 243, 248);
+        background: rgba(130, 155, 188, 58);
+        color: rgb(238, 241, 246);
     }
     QPushButton#ContextPadRailButton {
         background: transparent;
@@ -47,18 +48,21 @@ def launcher_stylesheet() -> str:
         border: 1px solid rgba(160, 190, 235, 44);
     }
     QFrame#ContextPadDivider {
-        background: rgba(255, 255, 255, 24);
+        background: rgba(255, 255, 255, 18);
         min-width: 1px;
         max-width: 1px;
     }
     QPushButton#ContextPadCommandButton,
     QPushButton#ContextPadRelatedButton {
-        border: 1px solid rgba(255, 255, 255, 24);
+        border: 1px solid rgba(255, 255, 255, 20);
         border-radius: 8px;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
-        padding: 6px;
+        padding: 4px 6px;
         text-align: center;
+    }
+    QPushButton#ContextPadRelatedButton {
+        border-radius: 6px;
     }
     QScrollArea {
         background: transparent;
@@ -86,17 +90,60 @@ def launcher_stylesheet() -> str:
     QFrame#ContextPadUtilityBar {
         background: transparent;
         border: none;
+        min-height: 22px;
+        max-height: 22px;
     }
     QToolButton#ContextPadIconButton {
-        background: rgba(255, 255, 255, 16);
-        border: 1px solid rgba(255, 255, 255, 24);
-        border-radius: 7px;
-        color: rgba(238, 241, 246, 210);
-        min-width: 14px;
-        min-height: 14px;
-        padding: 1px;
+        background: rgba(255, 255, 255, 12);
+        border: 1px solid rgba(255, 255, 255, 20);
+        border-radius: 6px;
+        color: rgba(234, 238, 244, 205);
+        min-width: 22px;
+        min-height: 22px;
+        max-width: 22px;
+        max-height: 22px;
+        padding: 0px;
     }
     QToolButton#ContextPadIconButton:hover {
-        background: rgba(255, 255, 255, 24);
+        background: rgba(255, 255, 255, 20);
+    }
+    """
+
+
+def manager_stylesheet() -> str:
+    """Return stylesheet for calm, tool-like manager surface."""
+
+    return """
+    QMainWindow {
+        background: rgb(34, 36, 40);
+        color: rgb(220, 224, 230);
+    }
+    QGroupBox {
+        border: 1px solid rgba(255, 255, 255, 16);
+        border-radius: 8px;
+        margin-top: 8px;
+        padding-top: 8px;
+        font-weight: 600;
+    }
+    QGroupBox::title {
+        subcontrol-origin: margin;
+        left: 8px;
+        padding: 0 2px;
+    }
+    QListWidget, QTreeWidget, QPlainTextEdit, QLineEdit, QComboBox {
+        border: 1px solid rgba(255, 255, 255, 18);
+        border-radius: 6px;
+        background: rgba(14, 16, 18, 145);
+        padding: 3px;
+    }
+    QPushButton {
+        border: 1px solid rgba(255, 255, 255, 20);
+        border-radius: 8px;
+        padding: 4px 8px;
+        min-height: 24px;
+        background: rgba(255, 255, 255, 9);
+    }
+    QPushButton:hover {
+        background: rgba(255, 255, 255, 14);
     }
     """

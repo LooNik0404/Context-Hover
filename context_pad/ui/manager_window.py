@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from context_pad.core.app_state import AppState
 from context_pad.core.script_library_editor import ScriptLibraryEditor
 from context_pad.maya_integration.qt_helpers import QtCore, QtGui, QtWidgets
+from context_pad.ui.styles import manager_stylesheet
 from context_pad.ui.widgets.color_picker import ColorPicker
 
 
@@ -22,6 +23,7 @@ class ManagerWindow(QtWidgets.QMainWindow):
 
         self.setWindowTitle("Context Pad Library Manager")
         self.resize(1020, 720)
+        self.setStyleSheet(manager_stylesheet())
 
         container = QtWidgets.QWidget(self)
         self.setCentralWidget(container)

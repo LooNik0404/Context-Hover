@@ -6,7 +6,7 @@ from collections import Counter
 from typing import Any, Dict, List, Tuple
 
 from context_pad.core.set_registry import SetRegistry
-from context_pad.maya_integration.qt_helpers import QtCore, QtWidgets
+from context_pad.maya_integration.qt_helpers import QtCore, QtGui, QtWidgets
 
 from .launcher_base import LauncherBase
 from .widgets.reference_set_picker import ReferenceSetPickerDialog
@@ -176,7 +176,9 @@ class SetLauncher(LauncherBase):
                     "id": set_name,
                     "name": self._elide_label(self._display_label(set_name)),
                     "category_id": "Main",
-                    "color": str(entry.get("button_color", state.get(set_name, {}).get("button_color", "#6B7280"))),
+                    "color": self._calm_color(
+                        str(entry.get("button_color", state.get(set_name, {}).get("button_color", "#6B7280")))
+                    ),
                     "display_order": int(entry.get("display_order", 1000)),
                     "tooltip": set_name,
                 }
@@ -216,7 +218,7 @@ class SetLauncher(LauncherBase):
                 {
                     "id": name,
                     "name": self._elide_label(self._display_label(name)),
-                    "color": str(meta.get("button_color", "#6B7280")),
+                    "color": self._calm_color(str(meta.get("button_color", "#6B7280"))),
                     "tooltip": name,
                 }
             )
@@ -494,6 +496,16 @@ class SetLauncher(LauncherBase):
 
         short_name = str(full_set_name).split("|")[-1]
         return short_name.split(":")[-1]
+
+    def _calm_color(self, color_hex: str) -> str:
+        base = QtGui.QColor(color_hex)
+        neutral = QtGui.QColor("#55606B")
+        mixed = QtGui.QColor(
+            int((base.red() * 0.62) + (neutral.red() * 0.38)),
+            int((base.green() * 0.62) + (neutral.green() * 0.38)),
+            int((base.blue() * 0.62) + (neutral.blue() * 0.38)),
+        )
+        return mixed.name()
 
     def _elide_label(self, label: str, max_chars: int = 28) -> str:
         """Elide long labels to keep single-column set list compact and readable."""

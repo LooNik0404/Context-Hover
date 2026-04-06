@@ -37,8 +37,8 @@ class LauncherBase(QtWidgets.QWidget):
         root_layout.addWidget(self._body)
 
         body_layout = QtWidgets.QVBoxLayout(self._body)
-        body_layout.setContentsMargins(8, 8, 8, 8)
-        body_layout.setSpacing(7)
+        body_layout.setContentsMargins(10, 10, 10, 10)
+        body_layout.setSpacing(8)
 
         top_bar = QtWidgets.QHBoxLayout()
         top_bar.setContentsMargins(0, 0, 0, 0)
@@ -61,7 +61,7 @@ class LauncherBase(QtWidgets.QWidget):
         content_layout.addLayout(self._left_column, 0)
 
         self._left_widget: QtWidgets.QWidget = CategoryBar()
-        self._left_widget.setFixedWidth(116)
+        self._left_widget.setFixedWidth(112)
         self._left_column.addWidget(self._left_widget)
 
         self._divider = QtWidgets.QFrame()

@@ -132,7 +132,7 @@ class CommandGrid(QtWidgets.QWidget):
             button_width = self._span_pixel_width(col_span, module_width)
             button.setMinimumWidth(button_width)
             button.setMaximumWidth(button_width)
-            row_height = 26 if self._display_mode == "list" else self._button_height
+            row_height = 24 if self._display_mode == "list" else self._button_height
             button.setMinimumHeight(row_height)
             button.setMaximumHeight(row_height)
             button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
@@ -153,8 +153,8 @@ class CommandGrid(QtWidgets.QWidget):
         layout = QtWidgets.QHBoxLayout(container)
         layout.setContentsMargins(2, 1, 2, 1)
         layout.setSpacing(4)
-        container.setMinimumHeight(20)
-        container.setMaximumHeight(20)
+        container.setMinimumHeight(15)
+        container.setMaximumHeight(15)
 
         line_left = QtWidgets.QFrame(container)
         line_left.setFrameShape(QtWidgets.QFrame.HLine)
