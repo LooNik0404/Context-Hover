@@ -24,6 +24,7 @@ class CommandGrid(QtWidgets.QWidget):
         self._visible_button_ids: List[str] = []
         self._columns = max(1, columns)
         self._display_mode = "grid"
+        self._available_width_override: int | None = None
 
         self._layout = QtWidgets.QGridLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
@@ -43,6 +44,12 @@ class CommandGrid(QtWidgets.QWidget):
 
         normalized = str(mode or "grid").strip().lower()
         self._display_mode = "list" if normalized == "list" else "grid"
+        self._rebuild_grid(self._visible_buttons or self._buttons)
+
+    def set_available_width_override(self, width: int | None) -> None:
+        """Optionally force layout width source from owner viewport geometry."""
+
+        self._available_width_override = int(width) if width is not None else None
         self._rebuild_grid(self._visible_buttons or self._buttons)
 
     def set_buttons(self, buttons: List[Dict[str, str]], rebuild: bool = True) -> None:
@@ -176,8 +183,11 @@ class CommandGrid(QtWidgets.QWidget):
     def _module_pixel_width(self) -> int:
         spacing = max(0, int(self._layout.horizontalSpacing()))
         margins = self._layout.contentsMargins()
-        viewport = self.parentWidget()
-        viewport_width = viewport.width() if viewport is not None else self.width()
+        if self._available_width_override is not None:
+            viewport_width = self._available_width_override
+        else:
+            viewport = self.parentWidget()
+            viewport_width = viewport.width() if viewport is not None else self.width()
         available = max(1, int(viewport_width) - margins.left() - margins.right())
         total_spacing = spacing * max(0, self._columns - 1)
         module = (available - total_spacing) // max(1, self._columns)

@@ -71,6 +71,8 @@ class SetLauncher(LauncherBase):
         def _apply_all_sets() -> None:
             if token != self._layout_refresh_token:
                 return
+            viewport_width = int(self._command_scroll.viewport().width()) if hasattr(self, "_command_scroll") else None
+            self.set_button_available_width(viewport_width)
             self.set_buttons(all_sets)
 
         QtCore.QTimer.singleShot(0, _apply_all_sets)

@@ -116,6 +116,11 @@ class LauncherBase(QtWidgets.QWidget):
 
         self._command_grid.set_display_mode(mode)
 
+    def set_button_available_width(self, width: int | None) -> None:
+        """Set explicit available width source for button layout calculations."""
+
+        self._command_grid.set_available_width_override(width)
+
     def show_at_cursor(self) -> None:
         """Show launcher near cursor and focus it."""
 
