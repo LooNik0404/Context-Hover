@@ -535,7 +535,7 @@ class ManagerWindow(QtWidgets.QMainWindow):
         self._editor.update_button(button["id"], payload)
         self._refresh_buttons()
         self._sync_selection_views()
-        self._status.setText("Properties applied")
+        self._commit_library_change("Properties applied and saved")
 
     def _apply_button_changes(self) -> None:
         button = self._selected_button()
@@ -556,7 +556,7 @@ class ManagerWindow(QtWidgets.QMainWindow):
             self._editor.update_button(button["id"], payload)
             self._refresh_buttons()
             self._sync_selection_views()
-            self._status.setText("Separator updated")
+            self._commit_library_change("Separator applied and saved")
             return
 
         language = self._code_language.currentText()
@@ -575,7 +575,19 @@ class ManagerWindow(QtWidgets.QMainWindow):
         self._editor.update_button(button["id"], payload)
         self._refresh_buttons()
         self._sync_selection_views()
-        self._status.setText("Button updated")
+        self._commit_library_change("Button code applied and saved")
+
+    def _commit_library_change(self, success_message: str) -> None:
+        """Persist editor changes to disk and refresh launcher UI."""
+
+        try:
+            self._editor.save()
+            from context_pad.bootstrap import refresh_script_launcher
+
+            refresh_script_launcher()
+            self._status.setText(success_message)
+        except Exception as exc:
+            self._status.setText(f"Apply failed: {exc}")
 
     def _save_library(self) -> None:
         try:
