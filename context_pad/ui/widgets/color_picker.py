@@ -23,9 +23,12 @@ class ColorPicker(QtWidgets.QWidget):
             grouped_palette = [("Palette", colors)]
         else:
             grouped_palette = [
-                ("Cool", ["#5B7896", "#667F99", "#70869A", "#7A8EA0"]),
+                ("Cool", ["#456A8F", "#5D82A8", "#7EA1C3", "#9AB8D1"]),
                 ("Neutral", ["#656D78", "#747C86", "#858A90", "#948E86"]),
                 ("Warm", ["#8C7564", "#997D6A", "#A78670", "#B58F77"]),
+                ("Purple", ["#6D5A9A", "#7D6BA8", "#8E7CB6", "#9E8DC4"]),
+                ("Green", ["#5F7F63", "#6E8F66", "#7EA178", "#8DB287"]),
+                ("Red", ["#8B5D5A", "#9D6865", "#AF7470", "#C0807B"]),
             ]
 
         layout = QtWidgets.QVBoxLayout(self)
