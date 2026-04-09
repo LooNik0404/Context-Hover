@@ -43,6 +43,7 @@ class SetLauncher(LauncherBase):
         self.set_manager_button_text("◉")
 
         self._last_selection: List[str] = []
+        self._launch_selection_snapshot: List[str] = []
         self._watch_timer = QtCore.QTimer(self)
         self._watch_timer.setInterval(300)
         self._watch_timer.timeout.connect(self._refresh_related_if_selection_changed)
@@ -80,38 +81,58 @@ class SetLauncher(LauncherBase):
     def on_add_requested(self) -> None:
         """LMB plus: create a local set from selection and register it."""
 
-        current = self._sets.get_current_selection()
-        if not current:
+        selection_seed = self._valid_selection_seed()
+        if not selection_seed:
             self._toast("Select objects first to create a set")
             return
 
-        new_name = self._sets.sanitize_set_name(self._suggest_set_name())
-        if not self._sets.create_set_from_selection(new_name):
-            self._toast("Could not create set")
+        suggested_name = self._suggest_set_name(selection_seed)
+        self._enter_interaction()
+        try:
+            user_name, ok = QtWidgets.QInputDialog.getText(
+                self,
+                "Create Set from Selection",
+                "Set name",
+                text=suggested_name,
+            )
+        finally:
+            self._exit_interaction()
+        if not ok:
             return
 
-        if not self._sets.set_exists(new_name):
-            self._log_warning(f"Created set was not found after creation: '{new_name}'")
+        raw_name = user_name.strip() or suggested_name
+        sanitized_name = self._sets.sanitize_set_name(raw_name)
+        unique_name = self._sets.ensure_unique_set_name(sanitized_name)
+        if unique_name != raw_name:
+            self._toast(f"Using unique set name: {unique_name}")
+
+        created_name = self._sets.create_set_from_selection(unique_name, selection=selection_seed)
+        if not created_name:
+            self._toast("Could not create set from selection")
+            return
+
+        if not self._sets.set_exists(created_name):
+            self._log_warning(f"Created set was not found after creation: '{created_name}'")
             self._toast("Set creation failed validation")
             return
 
-        member_count = self._sets.get_set_size(new_name)
+        member_count = self._sets.get_set_size(created_name)
         if member_count <= 0:
-            self._log_warning(f"Refusing to register empty set '{new_name}'")
+            self._log_warning(f"Refusing to register empty set '{created_name}'")
             self._toast("Set creation produced no members")
             return
 
-        color = self._choose_new_set_color(state=self._sets.load_scene_set_ui_state())
+        color = self._sets.choose_balanced_color(include_gray=False)
         self._sets.register_set_library_entry(
-            source_ref=new_name,
+            source_ref=created_name,
             source_kind="local_maya_set",
-            display_label=self._display_label(new_name),
+            display_label=self._display_label(created_name),
             color=color,
             hidden_in_launcher=False,
             is_referenced=False,
         )
         self.refresh_from_scene()
-        self._toast(f"Created set: {new_name}")
+        self._toast(f"Created set: {created_name}")
 
     def on_add_context_requested(self, global_pos: object) -> None:
         """RMB plus: show exactly two add actions."""
@@ -153,6 +174,7 @@ class SetLauncher(LauncherBase):
     def show_at_cursor(self) -> None:
         """Show launcher and refresh scene data each time."""
 
+        self._launch_selection_snapshot = self._sets.get_current_selection()
         self.refresh_from_scene()
         super().show_at_cursor()
         if self._is_pinned:
@@ -409,8 +431,15 @@ class SetLauncher(LauncherBase):
         if self._watch_timer.isActive():
             self._watch_timer.stop()
 
-    def _suggest_set_name(self) -> str:
+    def _suggest_set_name(self, selection: List[str] | None = None) -> str:
         """Suggest a practical new set name."""
+
+        chosen = selection if selection is not None else self._valid_selection_seed()
+        if chosen:
+            first_name = self._display_label(chosen[0]).replace(" ", "_")
+            base_seed = self._sets.sanitize_set_name(f"{first_name}_SET")
+            if base_seed:
+                return self._sets.ensure_unique_set_name(base_seed)
 
         existing = set(self._sets.list_scene_sets())
         base = "QuickSet"
@@ -437,6 +466,14 @@ class SetLauncher(LauncherBase):
 
         return sorted(palette_values, key=score)[0]
 
+    def _valid_selection_seed(self) -> List[str]:
+        """Prefer launch-time selection snapshot, fallback to current selection."""
+
+        snapshot = [item for item in self._launch_selection_snapshot if item]
+        if snapshot:
+            return snapshot
+        return self._sets.get_current_selection()
+
     def _open_reference_add_dialog(self) -> None:
         """Open picker to import reference-approved (or all) reference sets."""
 
@@ -457,7 +494,8 @@ class SetLauncher(LauncherBase):
         state = self._sets.load_scene_set_ui_state()
         added_count = 0
         for set_name in selected_sets:
-            color = str(state.get(set_name, {}).get("button_color", self._choose_new_set_color(state)))
+            existing = str(state.get(set_name, {}).get("button_color", ""))
+            color = existing or self._sets.choose_balanced_color(include_gray=False)
             self._sets.register_set_library_entry(
                 source_ref=set_name,
                 source_kind="referenced_maya_set",

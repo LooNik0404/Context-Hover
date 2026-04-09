@@ -2,13 +2,25 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from collections import Counter
+from typing import Any, Dict, List, Optional, Tuple
 
 from context_pad.maya_integration import maya_scene_meta, maya_sets
 
 
 class SetRegistry:
     """Facade over Maya set integration functions for launcher/service layers."""
+
+    _SET_COLORS: List[Tuple[str, str]] = [
+        ("Steel Blue", "#5D82A8"),
+        ("Olive Green", "#6E8F66"),
+        ("Muted Purple", "#7A70A3"),
+        ("Sky Blue", "#4A90E2"),
+        ("Moss Green", "#7EA178"),
+        ("Lavender", "#887CB0"),
+        ("Amber", "#D9822B"),
+        ("Slate Gray", "#6B7280"),
+    ]
 
     def list_scene_sets(self) -> List[str]:
         """List all non-default scene sets."""
@@ -35,10 +47,15 @@ class SetRegistry:
 
         return maya_sets.remove_set_from_selection(name)
 
-    def create_set_from_selection(self, name: str) -> bool:
-        """Create new set from current selection."""
+    def create_set_from_selection(self, name: str, selection: Optional[List[str]] = None) -> str | None:
+        """Create new set from current/explicit selection and return created name."""
 
-        return maya_sets.create_set_from_selection(name)
+        return maya_sets.create_set_from_selection(name, selection=selection)
+
+    def ensure_unique_set_name(self, name: str) -> str:
+        """Return Maya-safe unique set name using _NN suffix when needed."""
+
+        return maya_sets.ensure_unique_set_name(name)
 
     def update_set_from_selection(self, name: str) -> bool:
         """Update existing set from current selection."""
@@ -158,3 +175,26 @@ class SetRegistry:
         """Delete a scene-local set library entry."""
 
         return maya_scene_meta.delete_set_library_entry(entry_id)
+
+    def choose_balanced_color(self, include_gray: bool = True) -> str:
+        """Choose practical color by usage balance, avoiding recent repeats."""
+
+        palette_values = [hex_color for _, hex_color in self._SET_COLORS]
+        if not include_gray:
+            palette_values = [color for color in palette_values if color != "#6B7280"]
+
+        library = self.load_scene_set_library()
+        usage = Counter(str(entry.get("button_color", "")) for entry in library.values() if isinstance(entry, dict))
+        ordered_entries = sorted(
+            [entry for entry in library.values() if isinstance(entry, dict)],
+            key=lambda entry: int(entry.get("display_order", 1000)),
+        )
+        recent_colors = [str(entry.get("button_color", "")) for entry in ordered_entries[-2:]]
+
+        def score(color: str) -> tuple[int, int]:
+            repeat_penalty = 1 if color in recent_colors else 0
+            return (usage.get(color, 0), repeat_penalty)
+
+        if not palette_values:
+            return "#6B7280"
+        return sorted(palette_values, key=score)[0]

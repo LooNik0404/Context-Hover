@@ -109,29 +109,48 @@ def remove_set_from_selection(name: str) -> bool:
     return True
 
 
-def create_set_from_selection(name: str) -> bool:
-    """Create a set from current selection with a unique new name."""
+def create_set_from_selection(name: str, selection: Optional[List[str]] = None) -> str | None:
+    """Create a set from selection and return final created set name."""
 
     if cmds is None:
         _log_warning("Maya cmds unavailable; cannot create set")
-        return False
+        return None
 
     sanitized_name = sanitize_set_name(name)
     if sanitized_name != name:
         _log_info(f"Adjusted set name '{name}' -> '{sanitized_name}'")
 
-    selection = _current_scene_selection()
-    if not selection:
+    selected_items = list(selection) if selection is not None else _current_scene_selection()
+    if not selected_items:
         _log_warning("Cannot create set: selection is empty")
-        return False
-    if cmds.objExists(sanitized_name):
-        _log_warning(f"Cannot create set: '{sanitized_name}' already exists")
-        return False
+        return None
 
-    cmds.sets(selection, name=sanitized_name)
-    _mark_context_pad_set(sanitized_name)
-    _log_info(f"Created set '{sanitized_name}' with {len(selection)} members")
-    return True
+    unique_name = ensure_unique_set_name(sanitized_name)
+    if unique_name != sanitized_name:
+        _log_info(f"Adjusted duplicate set name '{sanitized_name}' -> '{unique_name}'")
+
+    cmds.sets(selected_items, name=unique_name)
+    _mark_context_pad_set(unique_name)
+    _log_info(f"Created set '{unique_name}' with {len(selected_items)} members")
+    return unique_name
+
+
+def ensure_unique_set_name(name: str) -> str:
+    """Return Maya-safe unique set name using _NN suffix when needed."""
+
+    sanitized_name = sanitize_set_name(name)
+    if cmds is None:
+        return sanitized_name
+    if not cmds.objExists(sanitized_name):
+        return sanitized_name
+
+    base_name = re.sub(r"_(\d{2})$", "", sanitized_name)
+    index = 1
+    while True:
+        candidate = f"{base_name}_{index:02d}"
+        if not cmds.objExists(candidate):
+            return candidate
+        index += 1
 
 
 def update_set_from_selection(name: str) -> bool:

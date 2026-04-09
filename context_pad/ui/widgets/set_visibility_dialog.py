@@ -176,10 +176,12 @@ class SetVisibilityDialog(QtWidgets.QDialog):
             return
 
         for set_name in dialog.selected_set_names():
+            color = self._sets.choose_balanced_color(include_gray=False)
             self._sets.register_set_library_entry(
                 source_ref=set_name,
                 source_kind="local_maya_set",
                 display_label=self._display_label(set_name),
+                color=color,
                 hidden_in_launcher=False,
                 is_referenced=False,
             )

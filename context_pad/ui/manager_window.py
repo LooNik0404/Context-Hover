@@ -532,10 +532,19 @@ class ManagerWindow(QtWidgets.QMainWindow):
             payload["item_type"] = "button"
             payload["color"] = self._prop_color.color()
             payload["button_size"] = size_mode
-        self._editor.update_button(button["id"], payload)
+        updated = self._editor.update_button(button["id"], payload)
+        if not updated:
+            self._status.setText(f"Apply failed: could not find button '{button.get('id', '')}'")
+            return
+        self._active_button_id = str(button.get("id", "")) or self._active_button_id
         self._refresh_buttons()
         self._sync_selection_views()
-        self._commit_library_change("Properties applied and saved")
+        self._commit_library_change(
+            "Properties applied and saved",
+            button_id=str(button.get("id", "")),
+            expected_fields=payload,
+            category_id=category_id,
+        )
 
     def _apply_button_changes(self) -> None:
         button = self._selected_button()
@@ -553,10 +562,19 @@ class ManagerWindow(QtWidgets.QMainWindow):
                 "item_type": "separator",
                 "button_size": "normal",
             }
-            self._editor.update_button(button["id"], payload)
+            updated = self._editor.update_button(button["id"], payload)
+            if not updated:
+                self._status.setText(f"Apply failed: could not find button '{button.get('id', '')}'")
+                return
+            self._active_button_id = str(button.get("id", "")) or self._active_button_id
             self._refresh_buttons()
             self._sync_selection_views()
-            self._commit_library_change("Separator applied and saved")
+            self._commit_library_change(
+                "Separator applied and saved",
+                button_id=str(button.get("id", "")),
+                expected_fields=payload,
+                category_id=str(payload.get("category_id", "")),
+            )
             return
 
         language = self._code_language.currentText()
@@ -572,12 +590,27 @@ class ManagerWindow(QtWidgets.QMainWindow):
             "item_type": "button",
             "button_size": size_mode,
         }
-        self._editor.update_button(button["id"], payload)
+        updated = self._editor.update_button(button["id"], payload)
+        if not updated:
+            self._status.setText(f"Apply failed: could not find button '{button.get('id', '')}'")
+            return
+        self._active_button_id = str(button.get("id", "")) or self._active_button_id
         self._refresh_buttons()
         self._sync_selection_views()
-        self._commit_library_change("Button code applied and saved")
+        self._commit_library_change(
+            "Button code applied and saved",
+            button_id=str(button.get("id", "")),
+            expected_fields=payload,
+            category_id=str(payload.get("category_id", "")),
+        )
 
-    def _commit_library_change(self, success_message: str) -> None:
+    def _commit_library_change(
+        self,
+        success_message: str,
+        button_id: str | None = None,
+        expected_fields: Dict[str, Any] | None = None,
+        category_id: str | None = None,
+    ) -> None:
         """Persist editor changes to disk and refresh launcher UI."""
 
         try:
@@ -585,9 +618,38 @@ class ManagerWindow(QtWidgets.QMainWindow):
             from context_pad.bootstrap import refresh_script_launcher
 
             refresh_script_launcher()
+            if button_id and expected_fields:
+                self._editor.reload()
+                reloaded = next((item for item in self._editor.buttons() if str(item.get("id", "")) == button_id), None)
+                if not reloaded:
+                    raise ValueError(f"saved button not found: {button_id}")
+                for key, expected_value in expected_fields.items():
+                    if key not in reloaded:
+                        continue
+                    if str(reloaded.get(key, "")) != str(expected_value):
+                        raise ValueError(f"saved field mismatch for '{key}' on button '{button_id}'")
+
+            preserve_category = category_id or self._current_category_id()
+            preserve_button_id = button_id or self._active_button_id
+            self._refresh_all()
+            if preserve_category:
+                self._restore_category_selection(preserve_category)
+            if preserve_button_id:
+                self._active_button_id = preserve_button_id
+                self._refresh_buttons()
+                self._sync_selection_views()
             self._status.setText(success_message)
         except Exception as exc:
             self._status.setText(f"Apply failed: {exc}")
+
+    def _restore_category_selection(self, category_id: str) -> None:
+        """Restore category list selection by id after full refresh."""
+
+        for row in range(self._category_list.count()):
+            item = self._category_list.item(row)
+            if str(item.data(QtCore.Qt.UserRole) or "") == category_id:
+                self._category_list.setCurrentRow(row)
+                return
 
     def _save_library(self) -> None:
         try:

@@ -24,6 +24,7 @@ class CategoryBar(QtWidgets.QWidget):
         self._wheel_timer = QtCore.QElapsedTimer()
         self._wheel_timer.start()
         self._last_wheel_switch_ms = -10_000
+        self._last_wheel_direction = 0
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -105,6 +106,12 @@ class CategoryBar(QtWidgets.QWidget):
             delta = wheel_event.angleDelta().y()
             if delta == 0:
                 return True
+
+            direction = 1 if delta > 0 else -1
+            if self._last_wheel_direction and direction != self._last_wheel_direction:
+                self._wheel_accumulator = 0
+                self._last_wheel_switch_ms = -10_000
+            self._last_wheel_direction = direction
 
             self._wheel_accumulator += int(delta)
             now_ms = self._wheel_timer.elapsed()
