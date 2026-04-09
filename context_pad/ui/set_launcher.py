@@ -87,16 +87,12 @@ class SetLauncher(LauncherBase):
             return
 
         suggested_name = self._suggest_set_name(selection_seed)
-        self._enter_interaction()
-        try:
-            user_name, ok = QtWidgets.QInputDialog.getText(
-                self,
-                "Create Set from Selection",
-                "Set name",
-                text=suggested_name,
-            )
-        finally:
-            self._exit_interaction()
+        user_name, ok = self._prompt_text_input(
+            title="Create Set from Selection",
+            label="Set name",
+            default_text=suggested_name,
+            select_all=True,
+        )
         if not ok:
             return
 
@@ -307,11 +303,12 @@ class SetLauncher(LauncherBase):
             self._exit_interaction()
 
     def _rename_set(self, old_name: str) -> None:
-        self._enter_interaction()
-        try:
-            new_name, ok = QtWidgets.QInputDialog.getText(self, "Rename Set", "New set name", text=old_name)
-        finally:
-            self._exit_interaction()
+        new_name, ok = self._prompt_text_input(
+            title="Rename Set",
+            label="New set name",
+            default_text=old_name,
+            select_all=True,
+        )
         if not ok or not new_name.strip() or new_name.strip() == old_name:
             return
 
@@ -579,3 +576,35 @@ class SetLauncher(LauncherBase):
         """Show lightweight user feedback near cursor."""
 
         QtWidgets.QToolTip.showText(self.mapToGlobal(self.rect().center()), message, self)
+
+    def _prompt_text_input(self, title: str, label: str, default_text: str, select_all: bool = True) -> tuple[str, bool]:
+        """Prompt text input under interaction lock with clean initial focus/selection."""
+
+        dialog = QtWidgets.QInputDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setLabelText(label)
+        dialog.setTextEchoMode(QtWidgets.QLineEdit.Normal)
+        dialog.setTextValue(default_text)
+        dialog.setOkButtonText("OK")
+        dialog.setCancelButtonText("Cancel")
+
+        line_edit = dialog.findChild(QtWidgets.QLineEdit)
+        if line_edit is not None:
+            line_edit.setText(default_text)
+
+            def _prepare_line_edit() -> None:
+                line_edit.setFocus(QtCore.Qt.ActiveWindowFocusReason)
+                if select_all:
+                    line_edit.selectAll()
+                else:
+                    line_edit.setCursorPosition(len(line_edit.text()))
+
+            QtCore.QTimer.singleShot(0, _prepare_line_edit)
+
+        self._enter_interaction()
+        try:
+            QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
+            accepted = dialog.exec_() == QtWidgets.QDialog.Accepted
+        finally:
+            self._exit_interaction()
+        return dialog.textValue(), accepted

@@ -25,6 +25,7 @@ class CommandGrid(QtWidgets.QWidget):
         self._columns = max(1, columns)
         self._display_mode = "grid"
         self._available_width_override: int | None = None
+        self._last_layout_width = -1
 
         self._layout = QtWidgets.QGridLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
@@ -90,6 +91,7 @@ class CommandGrid(QtWidgets.QWidget):
     def _rebuild_grid(self, buttons: List[Dict[str, str]]) -> None:
         """Recreate the visible button grid."""
 
+        self._last_layout_width = self._current_layout_width()
         while self._layout.count():
             item = self._layout.takeAt(0)
             widget = item.widget()
@@ -204,8 +206,18 @@ class CommandGrid(QtWidgets.QWidget):
         """Reflow modular widths against real viewport/content width."""
 
         super().resizeEvent(event)
-        if self._visible_buttons:
+        if self._visible_buttons and self._current_layout_width() != self._last_layout_width:
             self._rebuild_grid(self._visible_buttons)
+
+    def _current_layout_width(self) -> int:
+        """Return current effective width driver for row/module calculations."""
+
+        if self._available_width_override is not None:
+            return int(self._available_width_override)
+        viewport = self.parentWidget()
+        if viewport is not None:
+            return int(viewport.width())
+        return int(self.width())
 
     def _contrast_color(self, color: QtGui.QColor) -> QtGui.QColor:
         """Return black/white text color based on luminance contrast."""
