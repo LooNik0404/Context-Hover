@@ -37,6 +37,7 @@ class CategoryBar(QtWidgets.QWidget):
 
         self._list = QtWidgets.QListWidget()
         self._list.setObjectName("ContextPadCategoryList")
+        self._list.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self._list.itemSelectionChanged.connect(self._on_selection_changed)
         self._list.viewport().installEventFilter(self)
         self._list.installEventFilter(self)
@@ -52,6 +53,15 @@ class CategoryBar(QtWidgets.QWidget):
         """Set optional visual profile for stronger active-category readability."""
 
         self._visual_profile = str(profile or "default").strip().lower()
+        if self._visual_profile == "script":
+            self._list.setStyleSheet(
+                "QListWidget::item:selected {"
+                "border-left: 2px solid rgba(170,195,228,210);"
+                "padding-left: 4px;"
+                "}"
+            )
+        else:
+            self._list.setStyleSheet("")
         self._apply_visual_state()
 
     def set_categories(self, categories: List[Dict[str, str]]) -> None:
@@ -114,10 +124,7 @@ class CategoryBar(QtWidgets.QWidget):
             item = self._list.item(row)
             if item is None:
                 continue
-            raw_label = str(item.text()).lstrip("▌ ")
             is_active = row == current_row
-            marker = "▌ " if is_active else "  "
-            item.setText(f"{marker}{raw_label}")
             if is_active:
                 item.setBackground(QtGui.QColor(85, 105, 132, 88))
                 item.setForeground(QtGui.QColor(238, 243, 250))

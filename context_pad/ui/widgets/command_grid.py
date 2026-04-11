@@ -214,7 +214,14 @@ class CommandGrid(QtWidgets.QWidget):
         return (module_width * span) + (spacing * max(0, span - 1))
 
     def _elide_button_text(self, text: str, metrics: QtGui.QFontMetrics, max_width: int) -> str:
-        return metrics.elidedText(text, QtCore.Qt.ElideRight, max(12, int(max_width)))
+        limit = max(12, int(max_width))
+        if metrics.horizontalAdvance(text) <= limit:
+            return text
+
+        clipped = str(text)
+        while clipped and metrics.horizontalAdvance(clipped) > limit:
+            clipped = clipped[:-1]
+        return clipped
 
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:  # noqa: N802
         """Reflow modular widths against real viewport/content width."""
