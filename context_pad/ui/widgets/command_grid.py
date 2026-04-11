@@ -26,6 +26,7 @@ class CommandGrid(QtWidgets.QWidget):
         self._display_mode = "grid"
         self._available_width_override: int | None = None
         self._last_layout_width = -1
+        self._visual_profile = "default"
 
         self._layout = QtWidgets.QGridLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
@@ -51,6 +52,12 @@ class CommandGrid(QtWidgets.QWidget):
         """Optionally force layout width source from owner viewport geometry."""
 
         self._available_width_override = int(width) if width is not None else None
+        self._rebuild_grid(self._visible_buttons or self._buttons)
+
+    def set_visual_profile(self, profile: str) -> None:
+        """Set visual profile for button rendering without changing layout behavior."""
+
+        self._visual_profile = str(profile or "default").strip().lower()
         self._rebuild_grid(self._visible_buttons or self._buttons)
 
     def set_buttons(self, buttons: List[Dict[str, str]], rebuild: bool = True) -> None:
@@ -118,13 +125,11 @@ class CommandGrid(QtWidgets.QWidget):
             tooltip = str(item_data.get("tooltip", "")).strip()
             button.setToolTip(tooltip or str(button_name))
 
-            background = QtGui.QColor(item_data.get("color", "#4A89DC"))
+            color_value = str(item_data.get("color", "#4A89DC"))
+            size_mode = str(item_data.get("button_size", "normal")).lower()
+            background = self._button_background(color_value, size_mode)
             foreground = self._contrast_color(background)
-            base_style = f"background-color: {background.name()}; color: {foreground.name()};"
-            if self._display_mode == "list":
-                button.setStyleSheet(f"{base_style} text-align: left; padding-left: 8px; padding-right: 4px;")
-            else:
-                button.setStyleSheet(base_style)
+            button.setStyleSheet(self._button_stylesheet(background, foreground, size_mode))
 
             button.clicked.connect(lambda _=False, data=item_data: self.button_clicked.emit(data))
             button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -132,8 +137,12 @@ class CommandGrid(QtWidgets.QWidget):
                 lambda pos, data=item_data, b=button: self.button_context_requested.emit(data, b.mapToGlobal(pos))
             )
 
-            size_mode = str(item_data.get("button_size", "normal")).lower()
-            col_span = 1 if size_mode == "small" else min(2, self._columns)
+            if size_mode == "large":
+                col_span = self._columns
+            elif size_mode == "small":
+                col_span = 1
+            else:
+                col_span = min(2, self._columns)
             if col + col_span > self._columns:
                 row += 1
                 col = 0
@@ -141,7 +150,12 @@ class CommandGrid(QtWidgets.QWidget):
             button_width = self._span_pixel_width(col_span, module_width)
             button.setMinimumWidth(button_width)
             button.setMaximumWidth(button_width)
-            row_height = 24 if self._display_mode == "list" else self._button_height
+            if size_mode == "large":
+                row_height = 32 if self._display_mode == "list" else int(self._button_height + 10)
+            elif size_mode == "small":
+                row_height = 22 if self._display_mode == "list" else int(self._button_height - 6)
+            else:
+                row_height = 24 if self._display_mode == "list" else self._button_height
             button.setMinimumHeight(row_height)
             button.setMaximumHeight(row_height)
             button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
@@ -160,25 +174,25 @@ class CommandGrid(QtWidgets.QWidget):
 
         container = QtWidgets.QWidget(self)
         layout = QtWidgets.QHBoxLayout(container)
-        layout.setContentsMargins(2, 1, 2, 1)
-        layout.setSpacing(4)
-        container.setMinimumHeight(15)
-        container.setMaximumHeight(15)
+        layout.setContentsMargins(2, 0, 2, 0)
+        layout.setSpacing(3)
+        container.setMinimumHeight(11)
+        container.setMaximumHeight(11)
 
         line_left = QtWidgets.QFrame(container)
         line_left.setFrameShape(QtWidgets.QFrame.HLine)
-        line_left.setStyleSheet("color: rgba(220,220,220,35);")
+        line_left.setStyleSheet("color: rgba(220,220,220,28);")
         layout.addWidget(line_left, 1)
 
         label_text = str(item_data.get("name", "")).strip()
         if label_text:
             label = QtWidgets.QLabel(label_text, container)
-            label.setStyleSheet("color: rgba(220,220,220,100); font-size: 9px;")
+            label.setStyleSheet("color: rgba(220,220,220,86); font-size: 8px; letter-spacing: 0.2px;")
             layout.addWidget(label, 0)
 
         line_right = QtWidgets.QFrame(container)
         line_right.setFrameShape(QtWidgets.QFrame.HLine)
-        line_right.setStyleSheet("color: rgba(220,220,220,35);")
+        line_right.setStyleSheet("color: rgba(220,220,220,28);")
         layout.addWidget(line_right, 1)
         return container
 
@@ -224,3 +238,51 @@ class CommandGrid(QtWidgets.QWidget):
 
         luminance = (0.299 * color.red()) + (0.587 * color.green()) + (0.114 * color.blue())
         return QtGui.QColor("#111111") if luminance > 170 else QtGui.QColor("#F4F6FA")
+
+    def _button_background(self, base_hex: str, size_mode: str) -> QtGui.QColor:
+        """Return restrained background tone by size mode for stronger hierarchy."""
+
+        base = QtGui.QColor(base_hex)
+        if self._visual_profile != "script":
+            return base
+
+        neutral = QtGui.QColor("#4C5560")
+        if size_mode == "small":
+            mix = 0.58
+        elif size_mode == "large":
+            mix = 0.18
+        else:
+            mix = 0.34
+        return QtGui.QColor(
+            int((base.red() * (1.0 - mix)) + (neutral.red() * mix)),
+            int((base.green() * (1.0 - mix)) + (neutral.green() * mix)),
+            int((base.blue() * (1.0 - mix)) + (neutral.blue() * mix)),
+        )
+
+    def _button_stylesheet(self, background: QtGui.QColor, foreground: QtGui.QColor, size_mode: str) -> str:
+        """Build stateful stylesheet for clearer normal/hover/pressed visual feedback."""
+
+        hover = background.lighter(112)
+        pressed = background.darker(114)
+        border_alpha = "52" if size_mode == "large" else "38" if size_mode == "normal" else "28"
+        radius = "9" if size_mode == "large" else "8" if size_mode == "normal" else "7"
+        left_pad = "8" if self._display_mode == "list" else "6"
+        align = "left" if self._display_mode == "list" else "center"
+        return (
+            "QPushButton {"
+            f"background-color: {background.name()};"
+            f"color: {foreground.name()};"
+            f"border: 1px solid rgba(255,255,255,{border_alpha});"
+            f"border-radius: {radius}px;"
+            f"text-align: {align};"
+            f"padding-left: {left_pad}px; padding-right: 4px;"
+            "}"
+            "QPushButton:hover {"
+            f"background-color: {hover.name()};"
+            "border: 1px solid rgba(255,255,255,64);"
+            "}"
+            "QPushButton:pressed {"
+            f"background-color: {pressed.name()};"
+            "border: 1px solid rgba(255,255,255,92);"
+            "}"
+        )

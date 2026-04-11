@@ -25,6 +25,7 @@ class CategoryBar(QtWidgets.QWidget):
         self._wheel_timer.start()
         self._last_wheel_switch_ms = -10_000
         self._last_wheel_direction = 0
+        self._visual_profile = "default"
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -47,6 +48,12 @@ class CategoryBar(QtWidgets.QWidget):
         self._label.setText(title)
         self._label.setVisible(bool(title))
 
+    def set_visual_profile(self, profile: str) -> None:
+        """Set optional visual profile for stronger active-category readability."""
+
+        self._visual_profile = str(profile or "default").strip().lower()
+        self._apply_visual_state()
+
     def set_categories(self, categories: List[Dict[str, str]]) -> None:
         """Populate categories from data records with id/name/color keys."""
 
@@ -68,6 +75,7 @@ class CategoryBar(QtWidgets.QWidget):
             if not restored:
                 self._list.setCurrentRow(0)
         self._list.blockSignals(False)
+        self._apply_visual_state()
         self.category_changed.emit(self.current_category())
 
     def set_current_category(self, category_id: str) -> bool:
@@ -93,7 +101,35 @@ class CategoryBar(QtWidgets.QWidget):
     def _on_selection_changed(self) -> None:
         """Emit category changed when user changes selection."""
 
+        self._apply_visual_state()
         self.category_changed.emit(self.current_category())
+
+    def _apply_visual_state(self) -> None:
+        """Apply restrained but explicit active-state styling to category items."""
+
+        if self._visual_profile != "script":
+            return
+        current_row = self._list.currentRow()
+        for row in range(self._list.count()):
+            item = self._list.item(row)
+            if item is None:
+                continue
+            raw_label = str(item.text()).lstrip("▌ ")
+            is_active = row == current_row
+            marker = "▌ " if is_active else "  "
+            item.setText(f"{marker}{raw_label}")
+            if is_active:
+                item.setBackground(QtGui.QColor(85, 105, 132, 88))
+                item.setForeground(QtGui.QColor(238, 243, 250))
+                font = item.font()
+                font.setBold(True)
+                item.setFont(font)
+            else:
+                item.setBackground(QtGui.QColor(0, 0, 0, 0))
+                item.setForeground(QtGui.QColor(198, 205, 214))
+                font = item.font()
+                font.setBold(False)
+                item.setFont(font)
 
     def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
         """Switch categories via mouse wheel when hovering category rail."""

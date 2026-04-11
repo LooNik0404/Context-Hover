@@ -22,8 +22,10 @@ class ScriptLauncher(LauncherBase):
 
         category_widget = CategoryBar()
         category_widget.set_title("Categories")
+        category_widget.set_visual_profile("script")
         category_widget.category_changed.connect(self._command_grid.filter_by_category)
         self.set_left_widget(category_widget)
+        self._command_grid.set_visual_profile("script")
 
         self._command_grid.button_clicked.connect(self._on_script_clicked)
         self.refresh_data()
