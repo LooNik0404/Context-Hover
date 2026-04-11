@@ -18,6 +18,7 @@ class ScriptLauncher(LauncherBase):
         super().__init__(parent=parent)
         self.setWindowTitle("Context Pad")
         self.set_button_columns(4)
+        self.set_add_button_visible(False)
 
         category_widget = CategoryBar()
         category_widget.set_title("Categories")

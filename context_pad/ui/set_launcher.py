@@ -580,6 +580,24 @@ class SetLauncher(LauncherBase):
     def _prompt_text_input(self, title: str, label: str, default_text: str, select_all: bool = True) -> tuple[str, bool]:
         """Prompt text input under interaction lock with clean initial focus/selection."""
 
+        class _HotkeyLeakBlocker(QtCore.QObject):
+            """Temporarily suppress key-repeat leakage into newly focused line edits."""
+
+            def __init__(self, grace_ms: int = 180) -> None:
+                super().__init__()
+                self._timer = QtCore.QElapsedTimer()
+                self._timer.start()
+                self._grace_ms = max(0, int(grace_ms))
+
+            def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:  # noqa: N802
+                if event.type() == QtCore.QEvent.KeyPress:
+                    key_event = event
+                    if key_event.isAutoRepeat():
+                        return True
+                    if self._timer.elapsed() <= self._grace_ms:
+                        return True
+                return False
+
         dialog = QtWidgets.QInputDialog(self)
         dialog.setWindowTitle(title)
         dialog.setLabelText(label)
@@ -589,8 +607,10 @@ class SetLauncher(LauncherBase):
         dialog.setCancelButtonText("Cancel")
 
         line_edit = dialog.findChild(QtWidgets.QLineEdit)
+        leak_blocker = _HotkeyLeakBlocker()
         if line_edit is not None:
             line_edit.setText(default_text)
+            line_edit.installEventFilter(leak_blocker)
 
             def _prepare_line_edit() -> None:
                 line_edit.setFocus(QtCore.Qt.ActiveWindowFocusReason)
@@ -607,4 +627,6 @@ class SetLauncher(LauncherBase):
             accepted = dialog.exec_() == QtWidgets.QDialog.Accepted
         finally:
             self._exit_interaction()
+            if line_edit is not None:
+                line_edit.removeEventFilter(leak_blocker)
         return dialog.textValue(), accepted
