@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from context_pad.config import DEFAULT_CONFIG, PACKAGE_ROOT
+from context_pad.config import DEFAULT_CONFIG, get_active_manifest_path
 
 _ALLOWED_ACTION_TYPES = {"python_inline", "python_file", "mel_inline", "mel_file", "separator"}
 
@@ -140,7 +140,7 @@ class ScriptRegistry:
             if item_type not in {"button", "separator"}:
                 raise ManifestValidationError(f"{path}.item_type '{item_type}' is unsupported")
             button_size = str(button.get("button_size", "normal"))
-            if button_size not in {"normal", "small"}:
+            if button_size not in {"normal", "small", "large"}:
                 raise ManifestValidationError(f"{path}.button_size '{button_size}' is unsupported")
 
             submenu_id = button.get("submenu_id")
@@ -155,7 +155,7 @@ class ScriptRegistry:
         """Resolve manifest path across cwd, package-root, and scripts-root forms."""
 
         if path is None:
-            return DEFAULT_CONFIG.manifest_root / DEFAULT_CONFIG.manifest_filename
+            return get_active_manifest_path()
 
         candidate = Path(path).expanduser()
         if candidate.is_absolute():
@@ -163,14 +163,14 @@ class ScriptRegistry:
 
         search_paths = [
             candidate,
-            PACKAGE_ROOT / candidate,
-            PACKAGE_ROOT.parent / candidate,
+            DEFAULT_CONFIG.package_manifest_root / candidate,
+            DEFAULT_CONFIG.package_manifest_root.parent / candidate,
         ]
         for item in search_paths:
             if item.exists():
                 return item
 
-        return PACKAGE_ROOT / candidate
+        return DEFAULT_CONFIG.package_manifest_root / candidate
 
     def get_categories(self) -> List[Dict[str, Any]]:
         """Return categories in stable sorted order."""

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List
 
-from context_pad.config import DEFAULT_CONFIG
+from context_pad.config import DEFAULT_CONFIG, get_active_manifest_path
 
 from .script_registry import ManifestValidationError, ScriptRegistry
 
@@ -16,8 +16,8 @@ def run_registry_demo(
 ) -> Dict[str, object]:
     """Run valid and invalid manifest load checks and return summary."""
 
-    valid_path = valid_manifest or (DEFAULT_CONFIG.manifest_root / DEFAULT_CONFIG.manifest_filename)
-    broken_path = broken_manifest or (DEFAULT_CONFIG.manifest_root / "manifest_broken.json")
+    valid_path = valid_manifest or get_active_manifest_path()
+    broken_path = broken_manifest or (DEFAULT_CONFIG.package_manifest_root / "manifest_broken.json")
 
     registry = ScriptRegistry()
     valid_ok = registry.load_manifest(valid_path)

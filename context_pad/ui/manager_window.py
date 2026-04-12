@@ -179,12 +179,15 @@ class ManagerWindow(QtWidgets.QMainWindow):
         self._btn_apply_code = QtWidgets.QPushButton("Apply Code")
         self._btn_save_library = QtWidgets.QPushButton("Save Library")
         self._btn_reload_library = QtWidgets.QPushButton("Reload Library")
+        self._btn_open_library_folder = QtWidgets.QPushButton("Open Library Folder")
 
         self._btn_apply_code.clicked.connect(self._apply_button_changes)
         self._btn_save_library.clicked.connect(self._save_library)
         self._btn_reload_library.clicked.connect(self._reload_library)
+        self._btn_open_library_folder.clicked.connect(self._open_library_folder)
 
         layout.addWidget(self._btn_apply_code)
+        layout.addWidget(self._btn_open_library_folder)
         layout.addStretch(1)
         layout.addWidget(self._btn_save_library)
         layout.addWidget(self._btn_reload_library)
@@ -670,3 +673,17 @@ class ManagerWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
         self._status.setText("Library reloaded")
+
+    def _open_library_folder(self) -> None:
+        """Open active user library folder from manager action bar."""
+
+        try:
+            from context_pad.bootstrap import get_library_manifest_path, open_library_folder
+
+            manifest_path = get_library_manifest_path()
+            if open_library_folder():
+                self._status.setText(f"Opened library folder ({manifest_path})")
+            else:
+                self._status.setText("Could not open library folder")
+        except Exception as exc:
+            self._status.setText(f"Open folder failed: {exc}")

@@ -6,7 +6,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from context_pad.config import DEFAULT_CONFIG
+from context_pad.config import get_active_manifest_path
 from context_pad.data.io_json import load_json, save_json
 
 from .script_registry import ManifestValidationError, ScriptRegistry
@@ -18,7 +18,7 @@ class ScriptLibraryEditor:
     def __init__(self, manifest_path: str | Path | None = None) -> None:
         """Initialize editor and load manifest data."""
 
-        self._manifest_path = Path(manifest_path) if manifest_path else DEFAULT_CONFIG.manifest_root / DEFAULT_CONFIG.manifest_filename
+        self._manifest_path = Path(manifest_path) if manifest_path else get_active_manifest_path()
         self._registry = ScriptRegistry()
         self._data: Dict[str, Any] = {}
         self.reload()

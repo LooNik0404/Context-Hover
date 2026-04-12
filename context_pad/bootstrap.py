@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from typing import Optional
 
 from .core.app_state import AppState
+from .config import (
+    ensure_user_data_layout,
+    get_active_manifest_path,
+    get_user_config_path,
+    get_user_data_root,
+    load_user_config,
+)
 from .maya_integration.qt_helpers import QtCore, maya_main_window
 from .ui.manager_window import ManagerWindow
 from .ui.script_launcher import ScriptLauncher
@@ -23,6 +33,8 @@ _SCRIPT_HOLD_ACTIVE: bool = False
 _SET_HOLD_ACTIVE: bool = False
 _SCRIPT_HIDE_TIMER: Optional[QtCore.QTimer] = None
 _SET_HIDE_TIMER: Optional[QtCore.QTimer] = None
+_USER_SETUP_MARKER_BEGIN = "# >>> ContextPad autostart >>>"
+_USER_SETUP_MARKER_END = "# <<< ContextPad autostart <<<"
 
 
 def launch_context_pad() -> ManagerWindow:
@@ -31,10 +43,75 @@ def launch_context_pad() -> ManagerWindow:
     return show_manager_window()
 
 
+def install_startup() -> dict:
+    """One-time safe setup for user data + userSetup autostart block."""
+
+    paths = ensure_user_data_layout()
+    _install_usersetup_block()
+    print_paths()
+    return paths
+
+
+def autostart() -> bool:
+    """Quiet startup initialization using user config + user manifest."""
+
+    try:
+        ensure_user_data_layout()
+        _ = get_active_manifest_path()
+        return True
+    except Exception as exc:
+        _log_warning(f"Autostart failed: {exc}")
+        return False
+
+
+def get_library_folder_path() -> str:
+    """Return active user-editable Context Pad library folder path."""
+
+    manifest_path = get_active_manifest_path()
+    return str(manifest_path.parent)
+
+
+def get_library_manifest_path() -> str:
+    """Return active user-editable manifest path."""
+
+    return str(get_active_manifest_path())
+
+
+def print_paths() -> None:
+    """Print active Context Pad user paths for debugging/support."""
+
+    config = load_user_config()
+    print(f"[ContextPad] user_root: {get_user_data_root()}")
+    print(f"[ContextPad] config_path: {get_user_config_path()}")
+    print(f"[ContextPad] active_manifest_path: {get_active_manifest_path()}")
+    print(f"[ContextPad] config.active_manifest_path: {config.get('active_manifest_path', '')}")
+
+
+def open_library_folder() -> bool:
+    """Open active user library folder in OS file browser."""
+
+    folder = get_library_folder_path()
+    manifest = get_library_manifest_path()
+    print(f"[ContextPad] Opening library folder: {folder}")
+    print(f"[ContextPad] Active manifest: {manifest}")
+    try:
+        if sys.platform.startswith("win"):
+            os.startfile(folder)  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", folder])
+        else:
+            subprocess.Popen(["xdg-open", folder])
+        return True
+    except Exception as exc:
+        _log_warning(f"Could not open library folder: {exc}")
+        return False
+
+
 def show_manager_window() -> ManagerWindow:
     """Show singleton manager window."""
 
     global _MANAGER_WINDOW
+    ensure_user_data_layout()
     if _MANAGER_WINDOW is None or not _is_alive(_MANAGER_WINDOW):
         _MANAGER_WINDOW = ManagerWindow(app_state=AppState(), parent=maya_main_window())
     _MANAGER_WINDOW.show()
@@ -47,6 +124,7 @@ def show_script_launcher() -> ScriptLauncher:
     """Show the singleton script launcher near the cursor."""
 
     global _SCRIPT_LAUNCHER, _SCRIPT_HOLD_ACTIVE
+    ensure_user_data_layout()
     _cancel_script_hide_timer()
     if _SCRIPT_HOLD_ACTIVE and _SCRIPT_LAUNCHER is not None and _is_alive(_SCRIPT_LAUNCHER) and _SCRIPT_LAUNCHER.isVisible():
         return _SCRIPT_LAUNCHER
@@ -73,6 +151,7 @@ def show_set_launcher() -> SetLauncher:
     """Show the singleton set launcher near the cursor."""
 
     global _SET_LAUNCHER, _SET_HOLD_ACTIVE
+    ensure_user_data_layout()
     _cancel_set_hide_timer()
     if _SET_HOLD_ACTIVE and _SET_LAUNCHER is not None and _is_alive(_SET_LAUNCHER) and _SET_LAUNCHER.isVisible():
         return _SET_LAUNCHER
@@ -185,3 +264,51 @@ def _close_set_if_unpinned() -> None:
     if hasattr(_SET_LAUNCHER, "is_interaction_locked") and _SET_LAUNCHER.is_interaction_locked():
         return
     _SET_LAUNCHER.close()
+
+
+def _install_usersetup_block() -> None:
+    """Install Context Pad autostart snippet into Maya userSetup.py once."""
+
+    scripts_dir = _maya_user_scripts_dir()
+    scripts_dir.mkdir(parents=True, exist_ok=True)
+    user_setup = scripts_dir / "userSetup.py"
+    existing = user_setup.read_text(encoding="utf-8") if user_setup.exists() else ""
+    if _USER_SETUP_MARKER_BEGIN in existing and _USER_SETUP_MARKER_END in existing:
+        return
+
+    block = (
+        f"{_USER_SETUP_MARKER_BEGIN}\n"
+        "try:\n"
+        "    from context_pad.bootstrap import autostart\n"
+        "    autostart()\n"
+        "except Exception as _context_pad_exc:\n"
+        "    print(f\"[ContextPad][WARN] autostart failed: {_context_pad_exc}\")\n"
+        f"{_USER_SETUP_MARKER_END}\n"
+    )
+    with user_setup.open("a", encoding="utf-8") as handle:
+        if existing and not existing.endswith("\n"):
+            handle.write("\n")
+        handle.write(block)
+
+
+def _maya_user_scripts_dir() -> "Path":
+    from pathlib import Path
+
+    if cmds is not None:
+        try:
+            value = str(cmds.internalVar(userScriptDir=True) or "").strip()
+            if value:
+                return Path(value)
+        except Exception:
+            pass
+    return Path.home() / "maya" / "scripts"
+
+
+def _log_warning(message: str) -> None:
+    if cmds is not None:
+        try:
+            cmds.warning(f"[ContextPad] {message}")
+            return
+        except Exception:
+            pass
+    print(f"[ContextPad][WARN] {message}")
