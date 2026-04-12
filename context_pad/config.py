@@ -37,6 +37,17 @@ DEFAULT_CONFIG = ContextPadConfig()
 def get_user_data_root() -> Path:
     """Return Context Pad user-data folder rooted in Maya user area."""
 
+    scripts_parent: str | None = None
+    if cmds is not None:
+        try:
+            scripts_dir = str(cmds.internalVar(userScriptDir=True) or "").strip()
+            if scripts_dir:
+                scripts_parent = str(Path(scripts_dir).expanduser().resolve().parent)
+        except Exception:
+            scripts_parent = None
+    if scripts_parent:
+        return Path(scripts_parent) / _USER_FOLDER_NAME
+
     maya_root: str | None = None
     if cmds is not None:
         try:
@@ -44,7 +55,7 @@ def get_user_data_root() -> Path:
         except Exception:
             maya_root = None
     if maya_root:
-        return Path(maya_root) / _USER_FOLDER_NAME
+        return Path(maya_root).expanduser().resolve() / _USER_FOLDER_NAME
     return Path.home() / "maya" / _USER_FOLDER_NAME
 
 
@@ -75,19 +86,30 @@ def ensure_user_data_layout() -> Dict[str, Path]:
     """Ensure user data folder/config/manifest exist; copy defaults on first run."""
 
     user_root = get_user_data_root()
-    user_root.mkdir(parents=True, exist_ok=True)
+    try:
+        user_root.mkdir(parents=True, exist_ok=True)
+    except Exception as exc:
+        raise RuntimeError(f"Could not create user root '{user_root}': {exc}") from exc
 
     config_path = get_user_config_path()
-    if not config_path.exists():
-        config_path.write_text(json.dumps(default_user_config_payload(), indent=2), encoding="utf-8")
+    try:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        if not config_path.exists():
+            config_path.write_text(json.dumps(default_user_config_payload(), indent=2), encoding="utf-8")
+    except Exception as exc:
+        raise RuntimeError(f"Could not create config '{config_path}': {exc}") from exc
 
     manifest_path = get_default_user_manifest_path()
-    if not manifest_path.exists():
-        package_manifest = DEFAULT_CONFIG.package_manifest_root / DEFAULT_CONFIG.manifest_filename
-        if package_manifest.exists():
-            manifest_path.write_text(package_manifest.read_text(encoding="utf-8"), encoding="utf-8")
-        else:
-            manifest_path.write_text('{"version": 1, "categories": [], "buttons": [], "submenus": []}', encoding="utf-8")
+    try:
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        if not manifest_path.exists():
+            package_manifest = DEFAULT_CONFIG.package_manifest_root / DEFAULT_CONFIG.manifest_filename
+            if package_manifest.exists():
+                manifest_path.write_text(package_manifest.read_text(encoding="utf-8"), encoding="utf-8")
+            else:
+                manifest_path.write_text('{"version": 1, "categories": [], "buttons": [], "submenus": []}', encoding="utf-8")
+    except Exception as exc:
+        raise RuntimeError(f"Could not create manifest '{manifest_path}': {exc}") from exc
 
     return {
         "user_root": user_root,

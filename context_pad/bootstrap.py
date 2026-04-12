@@ -46,10 +46,17 @@ def launch_context_pad() -> ManagerWindow:
 def install_startup() -> dict:
     """One-time safe setup for user data + userSetup autostart block."""
 
-    paths = ensure_user_data_layout()
-    _install_usersetup_block()
-    print_paths()
-    return paths
+    try:
+        paths = ensure_user_data_layout()
+        print(f"[ContextPad] install_startup user_root: {paths.get('user_root')}")
+        print(f"[ContextPad] install_startup config_path: {paths.get('config_path')}")
+        print(f"[ContextPad] install_startup manifest_path: {paths.get('manifest_path')}")
+        _install_usersetup_block()
+        print_paths()
+        return paths
+    except Exception as exc:
+        _log_warning(f"install_startup failed: {exc}")
+        raise
 
 
 def autostart() -> bool:
