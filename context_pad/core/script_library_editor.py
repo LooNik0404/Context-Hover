@@ -31,6 +31,12 @@ class ScriptLibraryEditor:
             return
         self._data = load_json(self._manifest_path)
 
+    @property
+    def manifest_path(self) -> Path:
+        """Return active manifest path used by this editor instance."""
+
+        return self._manifest_path
+
     def categories(self) -> List[Dict[str, Any]]:
         """Return categories sorted by sort_order."""
 

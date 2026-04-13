@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from context_pad.core.app_state import AppState
@@ -29,6 +30,8 @@ class ManagerWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(container)
         root = QtWidgets.QVBoxLayout(container)
 
+        self._library_info = self._build_library_info_bar()
+
         self._tabs = QtWidgets.QTabWidget()
         self._tabs.addTab(self._build_button_setup_tab(), "Button Setup")
         self._tabs.addTab(self._build_code_editor_tab(), "Code Editor")
@@ -37,11 +40,29 @@ class ManagerWindow(QtWidgets.QMainWindow):
         self._status = QtWidgets.QLabel("Ready")
         shared_actions = self._build_shared_action_bar()
 
+        root.addWidget(self._library_info)
         root.addWidget(self._tabs)
         root.addWidget(shared_actions)
         root.addWidget(self._status)
 
         self._refresh_all()
+
+    def _build_library_info_bar(self) -> QtWidgets.QWidget:
+        """Show active library details so edit/save target is always visible."""
+
+        bar = QtWidgets.QFrame()
+        layout = QtWidgets.QHBoxLayout(bar)
+        layout.setContentsMargins(0, 2, 0, 2)
+        layout.setSpacing(6)
+
+        label = QtWidgets.QLabel("Active Manifest:")
+        self._manifest_path_label = QtWidgets.QLabel("")
+        self._manifest_path_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        self._manifest_path_label.setStyleSheet("color: rgba(210,225,255,220);")
+
+        layout.addWidget(label)
+        layout.addWidget(self._manifest_path_label, 1)
+        return bar
 
     def _build_button_setup_tab(self) -> QtWidgets.QWidget:
         tab = QtWidgets.QWidget()
@@ -193,7 +214,6 @@ class ManagerWindow(QtWidgets.QMainWindow):
         layout.addWidget(self._btn_reload_library)
         return bar
 
-
     def open_button_setup_tab(self) -> None:
         """Switch manager to Button Setup tab."""
 
@@ -203,13 +223,79 @@ class ManagerWindow(QtWidgets.QMainWindow):
         """Start quick add button flow from external launcher actions."""
 
         self.open_button_setup_tab()
-        if not self._current_category_id():
-            if self._category_list.count() > 0:
-                self._category_list.setCurrentRow(0)
+        if not self._current_category_id() and self._category_list.count() > 0:
+            self._category_list.setCurrentRow(0)
         self._add_button()
+
+    def _manifest_path(self) -> Path:
+        return self._editor.manifest_path
+
+    def _update_manifest_path_label(self) -> None:
+        manifest_path = str(self._manifest_path())
+        self._manifest_path_label.setText(manifest_path)
+        self._manifest_path_label.setToolTip(manifest_path)
+
+    def _set_status(self, text: str) -> None:
+        self._status.setText(text)
+        self._update_manifest_path_label()
+
+    def _show_error(self, title: str, message: str) -> None:
+        QtWidgets.QMessageBox.critical(self, title, message)
+        self._set_status(message)
+
+    def _validate_manifest_writable(self, manifest_path: Path) -> None:
+        """Small write-test helper so path errors are obvious before save."""
+
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        test_file = manifest_path.parent / ".context_pad_write_test"
+        test_file.write_text("ok", encoding="utf-8")
+        test_file.unlink(missing_ok=True)
+
+    def _persist_manifest_change(
+        self,
+        success_message: str,
+        *,
+        preserve_category_id: str | None = None,
+        preserve_button_id: str | None = None,
+        expected_button_fields: Dict[str, Any] | None = None,
+    ) -> bool:
+        """Persist current in-memory edits to active manifest and refresh views."""
+
+        manifest_path = self._manifest_path()
+        try:
+            self._validate_manifest_writable(manifest_path)
+            self._editor.save()
+            self._editor.reload()
+
+            if preserve_button_id and expected_button_fields:
+                saved_button = next((item for item in self._editor.buttons() if str(item.get("id", "")) == preserve_button_id), None)
+                if not saved_button:
+                    raise ValueError(f"Saved button '{preserve_button_id}' not found after reload.")
+                for key, expected in expected_button_fields.items():
+                    if key in saved_button and str(saved_button.get(key, "")) != str(expected):
+                        raise ValueError(f"Saved field mismatch for '{key}' on button '{preserve_button_id}'.")
+
+            from context_pad.bootstrap import refresh_script_launcher
+
+            refresh_script_launcher()
+
+            self._refresh_all()
+            if preserve_category_id:
+                self._restore_category_selection(preserve_category_id)
+            if preserve_button_id:
+                self._active_button_id = preserve_button_id
+                self._refresh_buttons()
+                self._sync_selection_views()
+
+            self._set_status(f"{success_message} ({manifest_path})")
+            return True
+        except Exception as exc:
+            self._show_error("Save Failed", f"Could not save library manifest:\n{manifest_path}\n\n{exc}")
+            return False
 
     def _refresh_all(self) -> None:
         self._editor.reload()
+        self._update_manifest_path_label()
         self._refresh_categories()
         self._refresh_category_dropdown()
         self._refresh_buttons()
@@ -334,18 +420,16 @@ class ManagerWindow(QtWidgets.QMainWindow):
         self._code_language.setCurrentText("Python" if action_type.startswith("python") else "MEL")
         source_value = button.get("source", "")
         if action_type.endswith("file"):
-            from pathlib import Path
-
             file_path = Path(str(source_value)).expanduser()
             if file_path.exists() and file_path.is_file():
                 try:
                     source_value = file_path.read_text(encoding="utf-8")
-                    self._status.setText("Loaded file-based button source into editor. Apply converts it to inline mode.")
+                    self._set_status("Loaded file-based button source into editor. Apply converts it to inline mode.")
                 except Exception:
                     source_value = f"# Could not read file: {file_path}"
             else:
                 source_value = f"# Missing file path: {file_path}\n# Replace with inline script and click Apply."
-                self._status.setText("File-based button path is missing. Apply to convert to inline mode.")
+                self._set_status("File-based button path is missing. Apply to convert to inline mode.")
 
         self._code_editor.setPlainText(str(source_value))
         self._code_tooltip.setText(button.get("tooltip", ""))
@@ -391,10 +475,8 @@ class ManagerWindow(QtWidgets.QMainWindow):
         text, ok = QtWidgets.QInputDialog.getText(self, "Add Category", "Category name")
         if not ok or not text.strip():
             return
-        self._editor.add_category(text.strip())
-        self._refresh_categories()
-        self._refresh_category_dropdown()
-        self._status.setText("Category added")
+        new_item = self._editor.add_category(text.strip())
+        self._persist_manifest_change("Category added and saved", preserve_category_id=str(new_item.get("id", "")))
 
     def _rename_category(self) -> None:
         category_id = self._current_category_id()
@@ -403,42 +485,43 @@ class ManagerWindow(QtWidgets.QMainWindow):
         text, ok = QtWidgets.QInputDialog.getText(self, "Rename Category", "New category name")
         if not ok or not text.strip():
             return
-        self._editor.rename_category(category_id, text.strip())
-        self._refresh_categories()
-        self._refresh_category_dropdown()
-        self._sync_selection_views()
-        self._status.setText("Category renamed")
+        updated = self._editor.rename_category(category_id, text.strip())
+        if not updated:
+            self._set_status("Rename failed: category not found")
+            return
+        self._persist_manifest_change("Category renamed and saved", preserve_category_id=category_id)
 
     def _delete_category(self) -> None:
         category_id = self._current_category_id()
         if not category_id:
             return
-        self._editor.delete_category(category_id)
-        self._refresh_categories()
-        self._refresh_category_dropdown()
-        self._refresh_buttons()
-        self._sync_selection_views()
-        self._status.setText("Category deleted")
+        deleted = self._editor.delete_category(category_id)
+        if not deleted:
+            self._set_status("Delete failed: category not found")
+            return
+        self._active_button_id = None
+        self._persist_manifest_change("Category deleted and saved")
 
     def _move_category(self, direction: int) -> None:
         category_id = self._current_category_id()
         if not category_id:
             return
-        self._editor.move_category(category_id, direction)
-        self._refresh_categories()
-        self._refresh_category_dropdown()
-        self._status.setText("Category moved")
+        moved = self._editor.move_category(category_id, direction)
+        if not moved:
+            self._set_status("Move ignored: category already at edge or missing")
+            return
+        self._persist_manifest_change("Category moved and saved", preserve_category_id=category_id)
 
     def _add_button(self) -> None:
         category_id = self._current_category_id()
         if not category_id:
-            self._status.setText("Select a category first")
+            self._set_status("Select a category first")
             return
 
         label, ok = QtWidgets.QInputDialog.getText(self, "Add Button", "Button name")
         if not ok:
             return
-        self._editor.add_button(
+        new_item = self._editor.add_button(
             {
                 "label": label.strip() or "New Button",
                 "category_id": category_id,
@@ -450,24 +533,25 @@ class ManagerWindow(QtWidgets.QMainWindow):
                 "button_size": "normal",
             }
         )
-        self._refresh_buttons()
-        self._active_button_id = self._current_button_id() or self._active_button_id
-        self._sync_selection_views()
-        self._status.setText("Button added")
+        self._persist_manifest_change(
+            "Button added and saved",
+            preserve_category_id=category_id,
+            preserve_button_id=str(new_item.get("id", "")),
+        )
 
     def _add_separator(self) -> None:
         """Create a non-executable visual separator item in current category."""
 
         category_id = self._current_category_id()
         if not category_id:
-            self._status.setText("Select a category first")
+            self._set_status("Select a category first")
             return
 
         label, ok = QtWidgets.QInputDialog.getText(self, "Add Separator", "Separator label")
         if not ok:
             return
 
-        self._editor.add_button(
+        new_item = self._editor.add_button(
             {
                 "label": label.strip() or "Separator",
                 "category_id": category_id,
@@ -479,10 +563,11 @@ class ManagerWindow(QtWidgets.QMainWindow):
                 "button_size": "normal",
             }
         )
-        self._refresh_buttons()
-        self._active_button_id = self._current_button_id() or self._active_button_id
-        self._sync_selection_views()
-        self._status.setText("Separator added")
+        self._persist_manifest_change(
+            "Separator added and saved",
+            preserve_category_id=category_id,
+            preserve_button_id=str(new_item.get("id", "")),
+        )
 
     def _rename_button(self) -> None:
         button = self._selected_button()
@@ -491,34 +576,49 @@ class ManagerWindow(QtWidgets.QMainWindow):
         text, ok = QtWidgets.QInputDialog.getText(self, "Rename Button", "New button name", text=button.get("label", ""))
         if not ok or not text.strip():
             return
-        self._editor.update_button(button["id"], {"label": text.strip()})
-        self._refresh_buttons()
-        self._sync_selection_views()
-        self._status.setText("Button renamed")
+        updated = self._editor.update_button(button["id"], {"label": text.strip()})
+        if not updated:
+            self._set_status(f"Rename failed: button '{button.get('id', '')}' not found")
+            return
+        self._persist_manifest_change(
+            "Button renamed and saved",
+            preserve_category_id=str(button.get("category_id", "")),
+            preserve_button_id=str(button.get("id", "")),
+        )
 
     def _delete_button(self) -> None:
-        button_id = self._current_button_id()
-        if not button_id:
+        button = self._selected_button()
+        if not button:
             return
-        self._editor.delete_button(button_id)
+        button_id = str(button.get("id", ""))
+        category_id = str(button.get("category_id", ""))
+        deleted = self._editor.delete_button(button_id)
+        if not deleted:
+            self._set_status(f"Delete failed: button '{button_id}' not found")
+            return
         self._active_button_id = None
-        self._refresh_buttons()
-        self._sync_selection_views()
-        self._status.setText("Button deleted")
+        self._persist_manifest_change("Button deleted and saved", preserve_category_id=category_id)
 
     def _move_button(self, direction: int) -> None:
-        button_id = self._current_button_id()
+        button = self._selected_button()
         category_id = self._current_category_id()
-        if not button_id or not category_id:
+        if not button or not category_id:
             return
-        self._editor.move_button(button_id, direction, category_id=category_id)
-        self._refresh_buttons()
-        self._status.setText("Button moved")
+        button_id = str(button.get("id", ""))
+        moved = self._editor.move_button(button_id, direction, category_id=category_id)
+        if not moved:
+            self._set_status("Move ignored: button already at edge or missing")
+            return
+        self._persist_manifest_change(
+            "Button moved and saved",
+            preserve_category_id=category_id,
+            preserve_button_id=button_id,
+        )
 
     def _apply_properties(self) -> None:
         button = self._selected_button()
         if not button:
-            self._status.setText("Select a button first")
+            self._set_status("Select a button first")
             return
 
         category_id = str(self._prop_category.currentData() or button.get("category_id", ""))
@@ -537,22 +637,19 @@ class ManagerWindow(QtWidgets.QMainWindow):
             payload["button_size"] = size_mode
         updated = self._editor.update_button(button["id"], payload)
         if not updated:
-            self._status.setText(f"Apply failed: could not find button '{button.get('id', '')}'")
+            self._set_status(f"Apply failed: could not find button '{button.get('id', '')}'")
             return
-        self._active_button_id = str(button.get("id", "")) or self._active_button_id
-        self._refresh_buttons()
-        self._sync_selection_views()
-        self._commit_library_change(
+        self._persist_manifest_change(
             "Properties applied and saved",
-            button_id=str(button.get("id", "")),
-            expected_fields=payload,
-            category_id=category_id,
+            preserve_category_id=category_id,
+            preserve_button_id=str(button.get("id", "")),
+            expected_button_fields=payload,
         )
 
     def _apply_button_changes(self) -> None:
         button = self._selected_button()
         if not button:
-            self._status.setText("Select a button in Button Setup")
+            self._set_status("Select a button in Button Setup")
             return
 
         if str(button.get("item_type", "button")) == "separator":
@@ -567,16 +664,13 @@ class ManagerWindow(QtWidgets.QMainWindow):
             }
             updated = self._editor.update_button(button["id"], payload)
             if not updated:
-                self._status.setText(f"Apply failed: could not find button '{button.get('id', '')}'")
+                self._set_status(f"Apply failed: could not find button '{button.get('id', '')}'")
                 return
-            self._active_button_id = str(button.get("id", "")) or self._active_button_id
-            self._refresh_buttons()
-            self._sync_selection_views()
-            self._commit_library_change(
+            self._persist_manifest_change(
                 "Separator applied and saved",
-                button_id=str(button.get("id", "")),
-                expected_fields=payload,
-                category_id=str(payload.get("category_id", "")),
+                preserve_category_id=str(payload.get("category_id", "")),
+                preserve_button_id=str(button.get("id", "")),
+                expected_button_fields=payload,
             )
             return
 
@@ -595,55 +689,14 @@ class ManagerWindow(QtWidgets.QMainWindow):
         }
         updated = self._editor.update_button(button["id"], payload)
         if not updated:
-            self._status.setText(f"Apply failed: could not find button '{button.get('id', '')}'")
+            self._set_status(f"Apply failed: could not find button '{button.get('id', '')}'")
             return
-        self._active_button_id = str(button.get("id", "")) or self._active_button_id
-        self._refresh_buttons()
-        self._sync_selection_views()
-        self._commit_library_change(
+        self._persist_manifest_change(
             "Button code applied and saved",
-            button_id=str(button.get("id", "")),
-            expected_fields=payload,
-            category_id=str(payload.get("category_id", "")),
+            preserve_category_id=str(payload.get("category_id", "")),
+            preserve_button_id=str(button.get("id", "")),
+            expected_button_fields=payload,
         )
-
-    def _commit_library_change(
-        self,
-        success_message: str,
-        button_id: str | None = None,
-        expected_fields: Dict[str, Any] | None = None,
-        category_id: str | None = None,
-    ) -> None:
-        """Persist editor changes to disk and refresh launcher UI."""
-
-        try:
-            self._editor.save()
-            from context_pad.bootstrap import refresh_script_launcher
-
-            refresh_script_launcher()
-            if button_id and expected_fields:
-                self._editor.reload()
-                reloaded = next((item for item in self._editor.buttons() if str(item.get("id", "")) == button_id), None)
-                if not reloaded:
-                    raise ValueError(f"saved button not found: {button_id}")
-                for key, expected_value in expected_fields.items():
-                    if key not in reloaded:
-                        continue
-                    if str(reloaded.get(key, "")) != str(expected_value):
-                        raise ValueError(f"saved field mismatch for '{key}' on button '{button_id}'")
-
-            preserve_category = category_id or self._current_category_id()
-            preserve_button_id = button_id or self._active_button_id
-            self._refresh_all()
-            if preserve_category:
-                self._restore_category_selection(preserve_category)
-            if preserve_button_id:
-                self._active_button_id = preserve_button_id
-                self._refresh_buttons()
-                self._sync_selection_views()
-            self._status.setText(success_message)
-        except Exception as exc:
-            self._status.setText(f"Apply failed: {exc}")
 
     def _restore_category_selection(self, category_id: str) -> None:
         """Restore category list selection by id after full refresh."""
@@ -655,24 +708,37 @@ class ManagerWindow(QtWidgets.QMainWindow):
                 return
 
     def _save_library(self) -> None:
-        try:
-            self._editor.save()
-            from context_pad.bootstrap import refresh_script_launcher
-
-            refresh_script_launcher()
-            self._status.setText("Library saved")
-        except Exception as exc:
-            self._status.setText(f"Save failed: {exc}")
+        self._persist_manifest_change(
+            "Library saved",
+            preserve_category_id=self._current_category_id() or None,
+            preserve_button_id=self._active_button_id,
+        )
 
     def _reload_library(self) -> None:
-        self._refresh_all()
+        manifest_path = self._manifest_path()
+        preserve_category_id = self._current_category_id() or None
+        preserve_button_id = self._active_button_id
         try:
-            from context_pad.bootstrap import refresh_script_launcher
+            self._editor.reload()
+            self._refresh_all()
+            if preserve_category_id:
+                self._restore_category_selection(preserve_category_id)
+            if preserve_button_id:
+                self._active_button_id = preserve_button_id
+                self._refresh_buttons()
+                self._sync_selection_views()
 
-            refresh_script_launcher()
-        except Exception:
-            pass
-        self._status.setText("Library reloaded")
+            try:
+                from context_pad.bootstrap import refresh_script_launcher
+
+                refresh_script_launcher()
+            except Exception as refresh_exc:
+                self._set_status(f"Library reloaded from {manifest_path} (launcher refresh failed: {refresh_exc})")
+                return
+
+            self._set_status(f"Library reloaded from {manifest_path}")
+        except Exception as exc:
+            self._show_error("Reload Failed", f"Could not reload library manifest:\n{manifest_path}\n\n{exc}")
 
     def _open_library_folder(self) -> None:
         """Open active user library folder from manager action bar."""
@@ -682,8 +748,8 @@ class ManagerWindow(QtWidgets.QMainWindow):
 
             manifest_path = get_library_manifest_path()
             if open_library_folder():
-                self._status.setText(f"Opened library folder ({manifest_path})")
+                self._set_status(f"Opened library folder ({manifest_path})")
             else:
-                self._status.setText("Could not open library folder")
+                self._set_status(f"Could not open library folder ({manifest_path})")
         except Exception as exc:
-            self._status.setText(f"Open folder failed: {exc}")
+            self._show_error("Open Folder Failed", f"Could not open library folder for:\n{self._manifest_path()}\n\n{exc}")
