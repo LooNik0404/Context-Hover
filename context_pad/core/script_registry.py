@@ -81,10 +81,10 @@ class ScriptRegistry:
         buttons = data.get("buttons")
         submenus = data.get("submenus", [])
 
-        if not isinstance(categories, list) or not categories:
-            raise ManifestValidationError("manifest.categories must be a non-empty list")
-        if not isinstance(buttons, list) or not buttons:
-            raise ManifestValidationError("manifest.buttons must be a non-empty list")
+        if not isinstance(categories, list):
+            raise ManifestValidationError("manifest.categories must be a list")
+        if not isinstance(buttons, list):
+            raise ManifestValidationError("manifest.buttons must be a list")
         if not isinstance(submenus, list):
             raise ManifestValidationError("manifest.submenus must be a list when provided")
 

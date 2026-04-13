@@ -144,6 +144,9 @@ class ManagerWindow(QtWidgets.QMainWindow):
         self._prop_category.currentIndexChanged.connect(self._on_property_edited)
         self._prop_size.currentIndexChanged.connect(self._on_property_edited)
         self._prop_color.color_changed.connect(self._on_property_edited)
+        self._prop_name.textChanged.connect(self._on_editor_content_changed)
+        self._prop_category.currentIndexChanged.connect(self._on_editor_content_changed)
+        self._prop_size.currentIndexChanged.connect(self._on_editor_content_changed)
 
         form.addRow("Button Name", self._prop_name)
         form.addRow("Category", self._prop_category)
@@ -168,6 +171,7 @@ class ManagerWindow(QtWidgets.QMainWindow):
         language_row = QtWidgets.QHBoxLayout()
         self._code_language = QtWidgets.QComboBox()
         self._code_language.addItems(["Python", "MEL"])
+        self._code_language.currentIndexChanged.connect(self._on_editor_content_changed)
         language_row.addWidget(QtWidgets.QLabel("Language"))
         language_row.addWidget(self._code_language)
         language_row.addStretch(1)
@@ -175,10 +179,12 @@ class ManagerWindow(QtWidgets.QMainWindow):
 
         self._code_editor = QtWidgets.QPlainTextEdit()
         self._code_editor.setPlaceholderText("Write script code here...")
+        self._code_editor.textChanged.connect(self._on_editor_content_changed)
         layout.addWidget(self._code_editor, 1)
 
         tooltip_row = QtWidgets.QFormLayout()
         self._code_tooltip = QtWidgets.QLineEdit()
+        self._code_tooltip.textChanged.connect(self._on_editor_content_changed)
         tooltip_row.addRow("Tooltip", self._code_tooltip)
         layout.addLayout(tooltip_row)
 
@@ -265,15 +271,6 @@ class ManagerWindow(QtWidgets.QMainWindow):
         try:
             self._validate_manifest_writable(manifest_path)
             self._editor.save()
-            self._editor.reload()
-
-            if preserve_button_id and expected_button_fields:
-                saved_button = next((item for item in self._editor.buttons() if str(item.get("id", "")) == preserve_button_id), None)
-                if not saved_button:
-                    raise ValueError(f"Saved button '{preserve_button_id}' not found after reload.")
-                for key, expected in expected_button_fields.items():
-                    if key in saved_button and str(saved_button.get(key, "")) != str(expected):
-                        raise ValueError(f"Saved field mismatch for '{key}' on button '{preserve_button_id}'.")
 
             from context_pad.bootstrap import refresh_script_launcher
 
@@ -286,6 +283,14 @@ class ManagerWindow(QtWidgets.QMainWindow):
                 self._active_button_id = preserve_button_id
                 self._refresh_buttons()
                 self._sync_selection_views()
+
+            if preserve_button_id and expected_button_fields:
+                saved_button = next((item for item in self._editor.buttons() if str(item.get("id", "")) == preserve_button_id), None)
+                if not saved_button:
+                    raise ValueError(f"Saved button '{preserve_button_id}' not found after reload.")
+                for key, expected in expected_button_fields.items():
+                    if key in saved_button and str(saved_button.get(key, "")) != str(expected):
+                        raise ValueError(f"Saved field mismatch for '{key}' on button '{preserve_button_id}'.")
 
             self._set_status(f"{success_message} ({manifest_path})")
             return True
@@ -448,6 +453,86 @@ class ManagerWindow(QtWidgets.QMainWindow):
         is_code_tab = self._tabs.currentIndex() == 1
         is_button = bool(button and str(button.get("item_type", "button")) != "separator")
         self._btn_apply_code.setEnabled(bool(is_code_tab and is_button))
+        self._btn_save_library.setText("Save Library*" if self._has_pending_selected_changes() else "Save Library")
+
+    def _on_editor_content_changed(self, *_: Any) -> None:
+        if self._is_syncing_properties:
+            return
+        self._update_shared_actions_state()
+
+    def _current_editor_payload(self, button: Dict[str, Any]) -> Dict[str, Any]:
+        item_type = str(button.get("item_type", "button"))
+        payload: Dict[str, Any] = {
+            "label": self._prop_name.text().strip() or button.get("label", "Button"),
+            "category_id": str(self._prop_category.currentData() or button.get("category_id", "")),
+            "item_type": item_type,
+        }
+        if item_type == "separator":
+            payload.update(
+                {
+                    "action_type": "separator",
+                    "source": "",
+                    "tooltip": "",
+                    "button_size": "normal",
+                }
+            )
+            return payload
+        payload.update(
+            {
+                "color": self._prop_color.color(),
+                "tooltip": self._code_tooltip.text().strip(),
+                "action_type": "python_inline" if self._code_language.currentText() == "Python" else "mel_inline",
+                "source": self._code_editor.toPlainText(),
+                "button_size": "small" if self._prop_size.currentText() == "Small" else "normal",
+            }
+        )
+        return payload
+
+    def _has_pending_selected_changes(self) -> bool:
+        button = self._selected_button()
+        if not button:
+            return False
+        payload = self._current_editor_payload(button)
+        for key, value in payload.items():
+            if str(button.get(key, "")) != str(value):
+                return True
+        return False
+
+    def _apply_pending_editor_changes_for_save(self) -> bool:
+        """Guard Save Library against silently ignoring currently visible edits."""
+
+        button = self._selected_button()
+        if not button or not self._has_pending_selected_changes():
+            return True
+
+        prompt = QtWidgets.QMessageBox(self)
+        prompt.setWindowTitle("Unsaved Editor Changes")
+        prompt.setIcon(QtWidgets.QMessageBox.Warning)
+        prompt.setText("The current Code Editor/Properties values are not applied yet.")
+        prompt.setInformativeText("Choose Apply to include visible edits in Save Library.")
+        apply_button = prompt.addButton("Apply", QtWidgets.QMessageBox.AcceptRole)
+        prompt.addButton("Discard", QtWidgets.QMessageBox.DestructiveRole)
+        prompt.addButton("Cancel", QtWidgets.QMessageBox.RejectRole)
+        prompt.exec_()
+
+        clicked = prompt.clickedButton()
+        if clicked == apply_button:
+            payload = self._current_editor_payload(button)
+            updated = self._editor.update_button(str(button.get("id", "")), payload)
+            if not updated:
+                self._show_error("Save Blocked", f"Could not apply pending edits for button '{button.get('id', '')}'.")
+                return False
+            self._set_status("Pending editor changes applied in memory before save.")
+            return True
+
+        button_text = prompt.buttonRole(clicked)
+        if button_text == QtWidgets.QMessageBox.RejectRole:
+            self._set_status("Save cancelled")
+            return False
+
+        self._sync_selection_views()
+        self._set_status("Pending visible edits discarded before save.")
+        return True
 
     def _on_category_changed(self, *_: Any) -> None:
         self._refresh_buttons()
@@ -708,6 +793,8 @@ class ManagerWindow(QtWidgets.QMainWindow):
                 return
 
     def _save_library(self) -> None:
+        if not self._apply_pending_editor_changes_for_save():
+            return
         self._persist_manifest_change(
             "Library saved",
             preserve_category_id=self._current_category_id() or None,
