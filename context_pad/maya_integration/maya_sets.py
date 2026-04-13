@@ -217,8 +217,11 @@ def rename_set(old_name: str, new_name: str) -> bool:
     if final_name != sanitized_name:
         _log_info(f"Adjusted duplicate rename target '{sanitized_name}' -> '{final_name}'")
 
-    cmds.rename(old_name, final_name)
-    _log_info(f"Renamed set '{old_name}' to '{final_name}'")
+    renamed_node = cmds.rename(old_name, final_name)
+    if not renamed_node:
+        _log_warning(f"Rename failed for '{old_name}' -> '{final_name}'")
+        return False
+    _log_info(f"Renamed set '{old_name}' to '{renamed_node}'")
     return True
 
 

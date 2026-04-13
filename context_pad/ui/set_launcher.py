@@ -60,7 +60,6 @@ class SetLauncher(LauncherBase):
     def refresh_from_scene(self) -> None:
         """Refresh all and related sets from scene data."""
 
-        self._sync_scene_sets_into_library()
         state = self._sets.refresh_scene_set_ui_state()
         library = self._sets.load_scene_set_library()
         all_sets = self._build_all_sets(state, library)
@@ -141,6 +140,7 @@ class SetLauncher(LauncherBase):
         try:
             menu = QtWidgets.QMenu(self)
             action_create = menu.addAction("Create Set from Selection")
+            action_add_existing_local = menu.addAction("Add Existing Local Sets...")
             action_add_ref = menu.addAction("Add Sets from Reference...")
             selected = menu.exec_(global_pos)
         finally:
@@ -148,6 +148,8 @@ class SetLauncher(LauncherBase):
 
         if selected is action_create:
             self.on_add_requested()
+        elif selected is action_add_existing_local:
+            self._import_existing_local_sets()
         elif selected is action_add_ref:
             self._open_reference_add_dialog()
 
@@ -234,7 +236,7 @@ class SetLauncher(LauncherBase):
             for entry in library.values()
             if entry and not bool(entry.get("hidden_in_launcher", False))
         }
-        selection = self._sets.get_current_selection()
+        selection = self._sets.get_ordered_selection()
         require_all = len(selection) > 1
         related_names = self._sets.get_related_sets_for_selection(selection=selection, require_all=require_all)
         if not related_names:
@@ -577,24 +579,43 @@ class SetLauncher(LauncherBase):
             return old_name
         return sorted(candidates)[-1] if candidates else requested_new_name
 
-    def _sync_scene_sets_into_library(self) -> None:
-        """Import local scene sets into hover library with practical readable colors."""
+    def _import_existing_local_sets(self) -> None:
+        """Explicitly import local scene sets that are not yet in hover library."""
 
         scene_sets = self._sets.list_scene_sets()
         library = self._sets.load_scene_set_library()
         known = {str(entry.get("source_ref", "")) for entry in library.values() if isinstance(entry, dict)}
-        for set_name in scene_sets:
-            if set_name in known:
-                continue
+        missing = [name for name in scene_sets if name not in known and not self._sets.is_referenced_set(name)]
+        if not missing:
+            self._toast("No unregistered local sets found")
+            return
+
+        self._enter_interaction()
+        try:
+            prompt = QtWidgets.QMessageBox.question(
+                self,
+                "Add Existing Local Sets",
+                f"Import {len(missing)} local set(s) into Hover library?",
+            )
+        finally:
+            self._exit_interaction()
+        if prompt != QtWidgets.QMessageBox.Yes:
+            return
+
+        added = 0
+        for set_name in missing:
             self._sets.register_set_library_entry(
                 source_ref=set_name,
                 source_kind="local_maya_set",
                 display_label=self._display_label(set_name),
                 color=self._sets.choose_balanced_color(include_gray=False),
                 hidden_in_launcher=False,
-                is_referenced=self._sets.is_referenced_set(set_name),
+                is_referenced=False,
                 selection_order=[],
             )
+            added += 1
+        self.refresh_from_scene()
+        self._toast(f"Added {added} local set(s)")
 
     def is_interaction_locked(self) -> bool:
         """Return True while set UI menus/dialogs are active."""
