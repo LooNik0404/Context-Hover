@@ -44,6 +44,7 @@ class SetLauncher(LauncherBase):
 
         self._last_selection: List[str] = []
         self._launch_selection_snapshot: List[str] = []
+        self._create_selection_snapshot: List[str] = []
         self._watch_timer = QtCore.QTimer(self)
         self._watch_timer.setInterval(300)
         self._watch_timer.timeout.connect(self._refresh_related_if_selection_changed)
@@ -59,13 +60,14 @@ class SetLauncher(LauncherBase):
     def refresh_from_scene(self) -> None:
         """Refresh all and related sets from scene data."""
 
+        self._sync_scene_sets_into_library()
         state = self._sets.refresh_scene_set_ui_state()
         library = self._sets.load_scene_set_library()
         all_sets = self._build_all_sets(state, library)
         related = self._build_related_sets(state, library)
 
         self._related_widget.set_related_sets(related)
-        self._last_selection = self._sets.get_current_selection()
+        self._last_selection = self._sets.get_ordered_selection()
         self._layout_refresh_token += 1
         token = self._layout_refresh_token
 
@@ -81,6 +83,7 @@ class SetLauncher(LauncherBase):
     def on_add_requested(self) -> None:
         """LMB plus: create a local set from selection and register it."""
 
+        self._create_selection_snapshot = self._sets.get_ordered_selection()
         selection_seed = self._valid_selection_seed()
         if not selection_seed:
             self._toast("Select objects first to create a set")
@@ -126,6 +129,7 @@ class SetLauncher(LauncherBase):
             color=color,
             hidden_in_launcher=False,
             is_referenced=False,
+            selection_order=selection_seed,
         )
         self.refresh_from_scene()
         self._toast(f"Created set: {created_name}")
@@ -260,7 +264,8 @@ class SetLauncher(LauncherBase):
         if not set_name:
             return
 
-        if self._sets.select_set(set_name):
+        ordered_members = self._selection_order_for_set(set_name)
+        if self._sets.select_set_with_saved_order(set_name, ordered_members=ordered_members):
             if not self._is_pinned:
                 self.close()
         else:
@@ -283,7 +288,8 @@ class SetLauncher(LauncherBase):
             menu = QtWidgets.QMenu(self)
             action_rename = menu.addAction("Rename")
             action_hide = menu.addAction("Hide from Launcher")
-            action_delete = menu.addAction("Delete")
+            action_remove_hover = menu.addAction("Remove from Hover")
+            action_delete = menu.addAction("Delete Set")
             action_color = menu.addAction("Change Color")
             action_update = menu.addAction("Update from Selection")
             selected = menu.exec_(global_pos)
@@ -291,6 +297,8 @@ class SetLauncher(LauncherBase):
                 self._rename_set(set_name)
             elif selected is action_hide:
                 self._set_hidden_in_launcher(set_name, hidden=True)
+            elif selected is action_remove_hover:
+                self._remove_from_hover(set_name)
             elif selected is action_delete:
                 self._delete_set(set_name)
             elif selected is action_color:
@@ -323,38 +331,48 @@ class SetLauncher(LauncherBase):
         if self._sets.rename_set(old_name, clean_name):
             library = self._sets.load_scene_set_library()
             entry_id = self._entry_id_for_source_ref(library, old_name)
+            final_name = self._resolve_current_name_from_old(old_name, clean_name)
             if entry_id:
                 self._sets.update_set_library_entry(
                     entry_id,
                     {
-                        "source_ref": clean_name,
-                        "display_label": self._display_label(clean_name),
+                        "source_ref": final_name,
+                        "display_label": self._display_label(final_name),
                         "is_referenced": False,
                     },
                 )
             else:
                 # Fallback safety: if entry missing, register renamed local set.
                 self._sets.register_set_library_entry(
-                    source_ref=clean_name,
+                    source_ref=final_name,
                     source_kind="local_maya_set",
-                    display_label=self._display_label(clean_name),
+                    display_label=self._display_label(final_name),
                     color=self._choose_new_set_color(state=self._sets.load_scene_set_ui_state()),
                     hidden_in_launcher=False,
                     is_referenced=False,
                 )
             self.refresh_from_scene()
-            self._toast(f"Renamed: {clean_name}")
+            self._toast(f"Renamed: {final_name}")
         else:
             self._toast("Could not rename set")
 
     def _delete_set(self, set_name: str) -> None:
+        exists = self._sets.set_exists(set_name)
+        if not exists:
+            self._toast("Set no longer exists. Use Remove from Hover to clear stale entry.")
+            return
         if self._sets.is_referenced_set(set_name):
-            self._toast("Referenced sets cannot be deleted")
+            self._toast("Referenced sets cannot be deleted. Use Remove from Hover.")
+            return
+        library = self._sets.load_scene_set_library()
+        entry = self._library_entry_for_set_name(library, set_name)
+        if entry and str(entry.get("source_kind", "")) != "local_maya_set":
+            self._toast("Only local scene sets can be deleted. Use Remove from Hover.")
             return
 
         self._enter_interaction()
         try:
-            confirm = QtWidgets.QMessageBox.question(self, "Delete Set", f"Delete set '{set_name}'?")
+            confirm = QtWidgets.QMessageBox.question(self, "Delete Set", f"Delete Maya set '{set_name}'?")
         finally:
             self._exit_interaction()
         if confirm != QtWidgets.QMessageBox.Yes:
@@ -362,10 +380,25 @@ class SetLauncher(LauncherBase):
 
         if self._sets.delete_set(set_name):
             self._sets.cleanup_missing_set_metadata()
+            entry_id = self._entry_id_for_source_ref(library, set_name)
+            if entry_id:
+                self._sets.delete_set_library_entry(entry_id)
             self.refresh_from_scene()
             self._toast(f"Deleted: {set_name}")
         else:
-            self._toast("Could not delete set")
+            self._toast("Could not delete set (local user-facing sets only)")
+
+    def _remove_from_hover(self, set_name: str) -> None:
+        """Remove launcher entry without deleting underlying Maya set."""
+
+        library = self._sets.load_scene_set_library()
+        entry_id = self._entry_id_for_source_ref(library, set_name)
+        if not entry_id:
+            self._toast("Set is not in hover library")
+            return
+        self._sets.delete_set_library_entry(entry_id)
+        self.refresh_from_scene()
+        self._toast(f"Removed from Hover: {set_name}")
 
     def _set_hidden_in_launcher(self, set_name: str, hidden: bool) -> None:
         """Store reversible launcher visibility for full set name key."""
@@ -407,6 +440,10 @@ class SetLauncher(LauncherBase):
 
     def _update_from_selection(self, set_name: str) -> None:
         if self._sets.update_set_from_selection(set_name):
+            library = self._sets.load_scene_set_library()
+            entry_id = self._entry_id_for_source_ref(library, set_name)
+            if entry_id:
+                self._sets.update_set_library_entry(entry_id, {"selection_order": self._sets.get_ordered_selection()})
             self.refresh_from_scene()
             self._toast(f"Updated from selection: {set_name}")
         else:
@@ -415,7 +452,7 @@ class SetLauncher(LauncherBase):
     def _refresh_related_if_selection_changed(self) -> None:
         """Refresh related sets while pinned and visible only."""
 
-        current = self._sets.get_current_selection()
+        current = self._sets.get_ordered_selection()
         if current == self._last_selection:
             return
         self.refresh_from_scene()
@@ -466,10 +503,13 @@ class SetLauncher(LauncherBase):
     def _valid_selection_seed(self) -> List[str]:
         """Prefer launch-time selection snapshot, fallback to current selection."""
 
+        create_snapshot = [item for item in self._create_selection_snapshot if item]
+        if create_snapshot:
+            return create_snapshot
         snapshot = [item for item in self._launch_selection_snapshot if item]
         if snapshot:
             return snapshot
-        return self._sets.get_current_selection()
+        return self._sets.get_ordered_selection()
 
     def _open_reference_add_dialog(self) -> None:
         """Open picker to import reference-approved (or all) reference sets."""
@@ -500,6 +540,7 @@ class SetLauncher(LauncherBase):
                 color=color,
                 hidden_in_launcher=False,
                 is_referenced=True,
+                selection_order=[],
             )
             added_count += 1
         self.refresh_from_scene()
@@ -520,6 +561,40 @@ class SetLauncher(LauncherBase):
             if str(entry.get("source_ref", "")) == source_ref:
                 return str(entry_id)
         return None
+
+    def _library_entry_for_set_name(self, library: Dict[str, Dict[str, Any]], set_name: str) -> Dict[str, Any] | None:
+        entry_id = self._entry_id_for_source_ref(library, set_name)
+        return library.get(entry_id) if entry_id else None
+
+    def _resolve_current_name_from_old(self, old_name: str, requested_new_name: str) -> str:
+        """Resolve actual final set name after rename (handles auto-suffix collisions)."""
+
+        if self._sets.set_exists(requested_new_name):
+            return requested_new_name
+        scene_sets = self._sets.list_scene_sets()
+        candidates = [name for name in scene_sets if name.startswith(f"{requested_new_name}_")]
+        if old_name in scene_sets:
+            return old_name
+        return sorted(candidates)[-1] if candidates else requested_new_name
+
+    def _sync_scene_sets_into_library(self) -> None:
+        """Import local scene sets into hover library with practical readable colors."""
+
+        scene_sets = self._sets.list_scene_sets()
+        library = self._sets.load_scene_set_library()
+        known = {str(entry.get("source_ref", "")) for entry in library.values() if isinstance(entry, dict)}
+        for set_name in scene_sets:
+            if set_name in known:
+                continue
+            self._sets.register_set_library_entry(
+                source_ref=set_name,
+                source_kind="local_maya_set",
+                display_label=self._display_label(set_name),
+                color=self._sets.choose_balanced_color(include_gray=False),
+                hidden_in_launcher=False,
+                is_referenced=self._sets.is_referenced_set(set_name),
+                selection_order=[],
+            )
 
     def is_interaction_locked(self) -> bool:
         """Return True while set UI menus/dialogs are active."""
@@ -576,6 +651,12 @@ class SetLauncher(LauncherBase):
         """Show lightweight user feedback near cursor."""
 
         QtWidgets.QToolTip.showText(self.mapToGlobal(self.rect().center()), message, self)
+
+    def _selection_order_for_set(self, set_name: str) -> List[str]:
+        library = self._sets.load_scene_set_library()
+        entry = self._library_entry_for_set_name(library, set_name)
+        order = entry.get("selection_order", []) if entry else []
+        return [str(item) for item in order] if isinstance(order, list) else []
 
     def _prompt_text_input(self, title: str, label: str, default_text: str, select_all: bool = True) -> tuple[str, bool]:
         """Prompt text input under interaction lock with clean initial focus/selection."""

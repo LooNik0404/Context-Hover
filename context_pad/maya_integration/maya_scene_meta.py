@@ -28,6 +28,7 @@ _DEFAULT_LIBRARY_ENTRY: Dict[str, Any] = {
     "display_order": 1000,
     "hidden_in_launcher": False,
     "is_referenced": False,
+    "selection_order": [],
 }
 
 
@@ -170,6 +171,8 @@ def save_scene_set_library(entries: Dict[str, Dict[str, Any]]) -> bool:
         merged["display_order"] = int(merged.get("display_order", 1000))
         merged["hidden_in_launcher"] = bool(merged.get("hidden_in_launcher", False))
         merged["is_referenced"] = bool(merged.get("is_referenced", False))
+        raw_order = merged.get("selection_order", [])
+        merged["selection_order"] = [str(item) for item in raw_order] if isinstance(raw_order, list) else []
         normalized[str(entry_id)] = merged
     payload = json.dumps({"entries": normalized}, sort_keys=True, indent=2)
     cmds.setAttr(f"{node}.{_META_ATTR_NAME}", payload, type="string")
@@ -183,6 +186,7 @@ def register_set_library_entry(
     color: str = "#6B7280",
     hidden_in_launcher: bool = False,
     is_referenced: bool = False,
+    selection_order: list[str] | None = None,
 ) -> str:
     """Create or update a set-library entry for a source set reference."""
 
@@ -199,6 +203,7 @@ def register_set_library_entry(
         "display_order": sort_order,
         "hidden_in_launcher": bool(hidden_in_launcher),
         "is_referenced": bool(is_referenced),
+        "selection_order": [str(item) for item in (selection_order or []) if str(item)],
     }
     save_scene_set_library(entries)
     return entry_id

@@ -32,6 +32,11 @@ class SetRegistry:
 
         return maya_sets.select_set(name)
 
+    def select_set_with_saved_order(self, name: str, ordered_members: Optional[List[str]] = None) -> bool:
+        """Select members of a set honoring stored member order when available."""
+
+        return maya_sets.select_set_with_saved_order(name, ordered_members=ordered_members)
+
     def replace_with_set(self, name: str) -> bool:
         """Replace current selection with set members."""
 
@@ -76,6 +81,11 @@ class SetRegistry:
         """Return current scene selection (empty outside Maya)."""
 
         return maya_sets.get_current_selection()
+
+    def get_ordered_selection(self) -> List[str]:
+        """Return ordered scene selection when Maya supports/has it enabled."""
+
+        return maya_sets.get_ordered_selection()
 
     def get_sets_for_object(self, node_name: str) -> List[str]:
         """Return all sets containing a node."""
@@ -154,6 +164,7 @@ class SetRegistry:
         color: str = "#6B7280",
         hidden_in_launcher: bool = False,
         is_referenced: bool = False,
+        selection_order: List[str] | None = None,
     ) -> str:
         """Register/update a set entry in scene-local Context Pad library."""
 
@@ -164,6 +175,7 @@ class SetRegistry:
             color=color,
             hidden_in_launcher=hidden_in_launcher,
             is_referenced=is_referenced,
+            selection_order=selection_order,
         )
 
     def update_set_library_entry(self, entry_id: str, updates: Dict[str, Any]) -> bool:

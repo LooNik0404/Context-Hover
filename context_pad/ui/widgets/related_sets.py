@@ -61,5 +61,9 @@ class RelatedSetsList(QtWidgets.QWidget):
             self._buttons.append(button)
 
         has_records = bool(records)
-        self._label.setVisible(has_records)
-        self.setVisible(has_records)
+        self._label.setVisible(True)
+        if not has_records:
+            placeholder = QtWidgets.QLabel("No related")
+            placeholder.setObjectName("ContextPadRelatedPlaceholder")
+            placeholder.setStyleSheet("color: rgba(220,220,220,120); font-size: 10px;")
+            self._rail.addWidget(placeholder)

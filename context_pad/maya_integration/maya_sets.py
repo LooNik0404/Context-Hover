@@ -70,10 +70,33 @@ def get_current_selection() -> List[str]:
     return _current_scene_selection()
 
 
+def get_ordered_selection() -> List[str]:
+    """Return ordered selection when Maya tracking is enabled, else fallback selection."""
+
+    return _current_scene_selection(prefer_ordered=True)
+
+
 def select_set(name: str) -> bool:
     """Replace selection with members of the specified set."""
 
     return replace_with_set(name)
+
+
+def select_set_with_saved_order(name: str, ordered_members: Optional[List[str]] = None) -> bool:
+    """Replace selection using saved member order while filtering against current set members."""
+
+    members = _set_members(name)
+    if members is None:
+        return False
+    ordered = [item for item in (ordered_members or []) if item in members]
+    remainder = [item for item in members if item not in ordered]
+    final_members = ordered + remainder
+    if not final_members:
+        _log_warning(f"Set '{name}' has no selectable members")
+        return False
+    cmds.select(final_members, replace=True)
+    _log_info(f"Selected {len(final_members)} members from set '{name}' using saved order")
+    return True
 
 
 def replace_with_set(name: str) -> bool:
@@ -190,12 +213,12 @@ def rename_set(old_name: str, new_name: str) -> bool:
     if old_name == sanitized_name:
         _log_info(f"Rename skipped: '{old_name}' already matches normalized name")
         return True
-    if cmds.objExists(sanitized_name):
-        _log_warning(f"Cannot rename set: '{sanitized_name}' already exists")
-        return False
+    final_name = ensure_unique_set_name(sanitized_name)
+    if final_name != sanitized_name:
+        _log_info(f"Adjusted duplicate rename target '{sanitized_name}' -> '{final_name}'")
 
-    cmds.rename(old_name, sanitized_name)
-    _log_info(f"Renamed set '{old_name}' to '{sanitized_name}'")
+    cmds.rename(old_name, final_name)
+    _log_info(f"Renamed set '{old_name}' to '{final_name}'")
     return True
 
 
@@ -345,13 +368,20 @@ def get_related_sets_for_selection(selection: Optional[List[str]] = None, requir
 
 
 
-def _current_scene_selection() -> List[str]:
+def _current_scene_selection(prefer_ordered: bool = False) -> List[str]:
     """Return selection excluding service/meta nodes and objectSet nodes."""
 
     if cmds is None:
         return []
 
-    selected = cmds.ls(selection=True, long=True) or []
+    selected: List[str] = []
+    if prefer_ordered:
+        try:
+            selected = cmds.ls(orderedSelection=True, long=True) or []
+        except Exception:
+            selected = []
+    if not selected:
+        selected = cmds.ls(selection=True, long=True) or []
     filtered: List[str] = []
     for node in selected:
         short_name = _short_name(node)
