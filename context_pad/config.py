@@ -16,7 +16,7 @@ except Exception:  # pragma: no cover - outside Maya
 PACKAGE_ROOT = Path(__file__).resolve().parent
 PACKAGE_MANIFEST_ROOT = PACKAGE_ROOT / "manifest"
 
-_USER_FOLDER_NAME = "ContextPad"
+_USER_FOLDER_NAME = "ContextPadData"
 _CONFIG_FILENAME = "config.json"
 _MANIFEST_FILENAME = "manifest.json"
 
@@ -37,26 +37,52 @@ DEFAULT_CONFIG = ContextPadConfig()
 def get_user_data_root() -> Path:
     """Return Context Pad user-data folder rooted in Maya user area."""
 
-    scripts_parent: str | None = None
+    return resolve_writable_user_data_root()
+
+
+def get_user_data_candidates() -> list[Path]:
+    """Return ordered candidate roots for user-editable Context Pad data."""
+
+    candidates: list[Path] = []
     if cmds is not None:
         try:
             scripts_dir = str(cmds.internalVar(userScriptDir=True) or "").strip()
             if scripts_dir:
-                scripts_parent = str(Path(scripts_dir).expanduser().resolve().parent)
+                candidates.append(Path(scripts_dir).expanduser().resolve() / _USER_FOLDER_NAME)
         except Exception:
-            scripts_parent = None
-    if scripts_parent:
-        return Path(scripts_parent) / _USER_FOLDER_NAME
-
-    maya_root: str | None = None
-    if cmds is not None:
+            pass
         try:
-            maya_root = str(cmds.internalVar(userAppDir=True) or "").strip()
+            app_dir = str(cmds.internalVar(userAppDir=True) or "").strip()
+            if app_dir:
+                candidates.append(Path(app_dir).expanduser().resolve() / _USER_FOLDER_NAME)
         except Exception:
-            maya_root = None
-    if maya_root:
-        return Path(maya_root).expanduser().resolve() / _USER_FOLDER_NAME
-    return Path.home() / "maya" / _USER_FOLDER_NAME
+            pass
+    candidates.append(Path.home() / "maya" / _USER_FOLDER_NAME)
+    candidates.append(Path.home() / ".context_pad_data")
+
+    deduped: list[Path] = []
+    seen: set[str] = set()
+    for item in candidates:
+        key = str(item)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+    return deduped
+
+
+def resolve_writable_user_data_root() -> Path:
+    """Resolve first writable user-data root using preferred + fallback candidates."""
+
+    errors: list[str] = []
+    for candidate in get_user_data_candidates():
+        try:
+            candidate.mkdir(parents=True, exist_ok=True)
+            _assert_path_writable(candidate)
+            return candidate
+        except Exception as exc:
+            errors.append(f"{candidate} ({exc})")
+    raise RuntimeError("Could not resolve writable Context Pad user-data root. Tried: " + "; ".join(errors))
 
 
 def get_user_config_path() -> Path:
@@ -85,11 +111,7 @@ def default_user_config_payload() -> Dict[str, Any]:
 def ensure_user_data_layout() -> Dict[str, Path]:
     """Ensure user data folder/config/manifest exist; copy defaults on first run."""
 
-    user_root = get_user_data_root()
-    try:
-        user_root.mkdir(parents=True, exist_ok=True)
-    except Exception as exc:
-        raise RuntimeError(f"Could not create user root '{user_root}': {exc}") from exc
+    user_root = resolve_writable_user_data_root()
 
     config_path = get_user_config_path()
     try:
@@ -116,6 +138,14 @@ def ensure_user_data_layout() -> Dict[str, Path]:
         "config_path": config_path,
         "manifest_path": manifest_path,
     }
+
+
+def _assert_path_writable(path: Path) -> None:
+    """Raise when path cannot be written to."""
+
+    test_file = path / ".context_pad_write_test"
+    test_file.write_text("ok", encoding="utf-8")
+    test_file.unlink(missing_ok=True)
 
 
 def load_user_config() -> Dict[str, Any]:

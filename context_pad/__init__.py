@@ -97,6 +97,22 @@ def print_paths():
     return _print()
 
 
+def diagnose_install():
+    """Lazy import and print install diagnostics."""
+
+    from .bootstrap import diagnose_install as _diagnose
+
+    return _diagnose()
+
+
+def install_hotkeys_startup():
+    """Lazy import and install optional hotkey-startup fallback block."""
+
+    from .bootstrap import install_hotkeys_startup as _install_hotkeys
+
+    return _install_hotkeys()
+
+
 __all__ = [
     "launch_context_pad",
     "show_manager_window",
@@ -110,4 +126,6 @@ __all__ = [
     "get_library_folder_path",
     "get_library_manifest_path",
     "print_paths",
+    "diagnose_install",
+    "install_hotkeys_startup",
 ]
